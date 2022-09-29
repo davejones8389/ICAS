@@ -11,8 +11,8 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <Content Remove="mssql-demo\Post-Deployment\*.sql" />
-        <PostDeploy Include="mssql-demo\Post-Deployment\PostDeploy.sql" />
+        <Content Remove="SQL\mssql-demo\Post-Deployment\*.sql" />
+        <PostDeploy Include="SQL\mssql-demo\Post-Deployment\PostDeploy.sql" />
         <!-- <PostDeploy Include="mssql-demo\Post-Deployment\3. grant exec sp access.sql" />
         <PreDeploy Include="mssql-demo\Pre-Deployment\Script.PreDeployment.sql" /> -->
         <!-- <Build Remove="mssql-demo\Security\permissions\cursor alternative.sql" />   -->
