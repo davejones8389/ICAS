@@ -1,0 +1,258 @@
+{
+	"name": "PL_FinancialYear_Check_copy1",
+	"properties": {
+		"activities": [
+			{
+				"name": "Source data financial years",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "audit.Source_Data_Financial_Years"
+				},
+				"linkedServiceName": {
+					"referenceName": "icaswf_datafactory_development_database",
+					"type": "LinkedServiceReference"
+				}
+			},
+			{
+				"name": "Check Financial Years",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Source data financial years",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": "select * from [audit].[Check_Financial_Years]",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "AzureSqlTable1",
+						"type": "DatasetReference"
+					}
+				}
+			},
+			{
+				"name": "Fin Year Check",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "Check Financial Years",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@if(\nand(\n    and(\n        and(\n            and(\n                and(\n                    and(\n                        and(\n                            and(\n                                and(\n                                    and(\n                                        and(\n                        equals(\n        activity('Check Financial Years').output.firstRow.Adult_Social_Care_Activity,activity('Check Financial Years').output.firstRow.Community_Activity_Bury\n    ),\n    equals(\n        activity('Check Financial Years').output.firstRow.Adult_Social_Care_Activity,activity('Check Financial Years').output.firstRow.Community_Activity_Oldham\n    )\n                    ),\n                    equals(\n        activity('Check Financial Years').output.firstRow.Adult_Social_Care_Activity,activity('Check Financial Years').output.firstRow.Community_Activity_Rochdale_1\n    )\n                ),\n                equals(\n        activity('Check Financial Years').output.firstRow.Adult_Social_Care_Activity,activity('Check Financial Years').output.firstRow.Community_Activity_Rochdale_2\n    )           \n            ),\n        equals(\n        activity('Check Financial Years').output.firstRow.Adult_Social_Care_Activity,activity('Check Financial Years').output.firstRow.Community_Activity_Salford\n    )\n        ),\n        equals(\n        activity('Check Financial Years').output.firstRow.Adult_Social_Care_Activity,activity('Check Financial Years').output.firstRow.Diagnostics_Salford\n    )\n    ),\n        equals(\n        activity('Check Financial Years').output.firstRow.Adult_Social_Care_Activity,activity('Check Financial Years').output.firstRow.ESR\n    )\n),\nequals(\n        activity('Check Financial Years').output.firstRow.Adult_Social_Care_Activity,activity('Check Financial Years').output.firstRow.SingleSource\n    )\n                ),\n                equals(\n        activity('Check Financial Years').output.firstRow.Adult_Social_Care_Activity,activity('Check Financial Years').output.firstRow.SLR\n    )\n            ),\n            equals(\n        activity('Check Financial Years').output.firstRow.Adult_Social_Care_Activity,activity('Check Financial Years').output.firstRow.SUS_Acute_AE\n    )\n        ),\n        equals(\n        activity('Check Financial Years').output.firstRow.Adult_Social_Care_Activity,activity('Check Financial Years').output.firstRow.SUS_Acute_OP\n    )\n    ),\n    equals(\n        activity('Check Financial Years').output.firstRow.Adult_Social_Care_Activity,activity('Check Financial Years').output.firstRow.SUS_Acute_IP\n    )\n),\nif(\nor(\nor(\nequals(\nactivity('Check Financial Years').output.firstRow.Adult_Social_Care_Activity,'Table not populated'),\nequals(\nactivity('Check Financial Years').output.firstRow.Adult_Social_Care_Activity,'More than one Financial Year populated')),\nequals(\nactivity('Check Financial Years').output.firstRow.Adult_Social_Care_Activity,'Financial Year not populated')\n),\nFALSE,\nTRUE\n),\nFALSE)",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "var_false",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "Send email for failed FY summary",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "FinYearCheck",
+								"value": "FALSE"
+							}
+						},
+						{
+							"name": "Send email for failed FY summary",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "PL_SendEmailNotification_Generic",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"NotificationMailAddressList": {
+										"value": "@pipeline().parameters.NotificationMailAddressList",
+										"type": "Expression"
+									},
+									"ParentPipelineName": {
+										"value": "@concat(pipeline().parameters.ParentPipeline, if(equals(string(length(string(pipeline().parameters.ParentPipeline))), '0'), '','.'), pipeline().Pipeline)",
+										"type": "Expression"
+									},
+									"ParentPipelineStatus": "Success",
+									"MessageContentSP": "EMailNotification_PLFinancialYearCheck",
+									"MessageSubject": "Summary of Financial Years in Input Datasets",
+									"ParentPipelineRunId": {
+										"value": "@pipeline().RunId",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					],
+					"ifTrueActivities": [
+						{
+							"name": "PL_procedurecaller_generic",
+							"type": "ExecutePipeline",
+							"dependsOn": [
+								{
+									"activity": "Send email for succcesful FY summary",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "PL_ProcedureCaller_Generic",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"ProcedureGroup": {
+										"value": "@pipeline().parameters.ProcedureGroup",
+										"type": "Expression"
+									},
+									"ProcedureGroupStartRunID": {
+										"value": "@pipeline().parameters.ProcedureGroupStartRunID",
+										"type": "Expression"
+									},
+									"ProcedureGroupEndRunID": {
+										"value": "@pipeline().parameters.ProcedureGroupEndRunID",
+										"type": "Expression"
+									},
+									"ParentPipeline": {
+										"value": "@pipeline().parameters.ParentPipeline",
+										"type": "Expression"
+									},
+									"NotificationMailAddressList": {
+										"value": "@pipeline().parameters.NotificationMailAddressList",
+										"type": "Expression"
+									},
+									"SendNotificationMail": {
+										"value": "@pipeline().parameters.SendNotificationMail",
+										"type": "Expression"
+									},
+									"ContinueFromLastProcedureFailure": {
+										"value": "@pipeline().parameters.ContinueFromLastProcedureFailure",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "Send email for succcesful FY summary",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "PL_SendEmailNotification_Generic",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"NotificationMailAddressList": {
+										"value": "@pipeline().parameters.NotificationMailAddressList",
+										"type": "Expression"
+									},
+									"ParentPipelineName": {
+										"value": "@concat(pipeline().parameters.ParentPipeline, if(equals(string(length(string(pipeline().parameters.ParentPipeline))), '0'), '','.'), pipeline().Pipeline)",
+										"type": "Expression"
+									},
+									"ParentPipelineStatus": "Success",
+									"MessageContentSP": "EMailNotification_PLFinancialYearCheck",
+									"MessageSubject": "Summary of Financial Years in Input Datasets",
+									"ParentPipelineRunId": {
+										"value": "@pipeline().RunId",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			}
+		],
+		"concurrency": 1,
+		"parameters": {
+			"ProcedureGroup": {
+				"type": "string",
+				"defaultValue": "controller"
+			},
+			"ProcedureGroupStartRunID": {
+				"type": "string",
+				"defaultValue": "1"
+			},
+			"ProcedureGroupEndRunID": {
+				"type": "string",
+				"defaultValue": "5"
+			},
+			"ParentPipeline": {
+				"type": "string"
+			},
+			"NotificationMailAddressList": {
+				"type": "string",
+				"defaultValue": "carsten.adams@kpmg.co.uk"
+			},
+			"SendNotificationMail": {
+				"type": "bool",
+				"defaultValue": true
+			},
+			"ContinueFromLastProcedureFailure": {
+				"type": "bool",
+				"defaultValue": false
+			}
+		},
+		"variables": {
+			"IsProcedureError": {
+				"type": "String",
+				"defaultValue": "False"
+			},
+			"EntryPoint": {
+				"type": "String"
+			},
+			"ParentPipelineLength": {
+				"type": "String"
+			},
+			"FinYearCheck": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "PL Backup"
+		},
+		"annotations": []
+	}
+}

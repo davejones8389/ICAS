@@ -1,0 +1,10 @@
+{
+	"name": "qara-test",
+	"properties": {
+		"privateLinkResourceId": "/subscriptions/f124cf91-5b67-454a-9cee-eb0d90b03461/resourceGroups/icaswf-sql-resource-group/providers/Microsoft.Sql/servers/icaswf-sql-server",
+		"groupId": "sqlServer",
+		"fqdns": [
+			"icaswf-sql-server.database.windows.net"
+		]
+	}
+}

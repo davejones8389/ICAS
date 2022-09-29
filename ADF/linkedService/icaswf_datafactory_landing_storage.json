@@ -1,0 +1,15 @@
+{
+	"name": "icaswf_datafactory_landing_storage",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
+	"properties": {
+		"connectVia": {
+			"referenceName": "IntegrationRuntime",
+			"type": "IntegrationRuntimeReference"
+		},
+		"type": "AzureBlobStorage",
+		"typeProperties": {
+			"serviceEndpoint": "https://icaswflanding.blob.core.windows.net/"
+		},
+		"annotations": []
+	}
+}

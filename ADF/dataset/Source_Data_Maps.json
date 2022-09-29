@@ -1,0 +1,62 @@
+{
+	"name": "Source_Data_Maps",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "icaswf_datafactory_landing_storage",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"SheetName": {
+				"type": "string"
+			},
+			"Range": {
+				"type": "string"
+			},
+			"WorkbookName": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "DS Data Maps"
+		},
+		"annotations": [],
+		"type": "Excel",
+		"typeProperties": {
+			"sheetName": {
+				"value": "@dataset().SheetName",
+				"type": "Expression"
+			},
+			"location": {
+				"type": "AzureBlobStorageLocation",
+				"fileName": {
+					"value": "@dataset().WorkbookName",
+					"type": "Expression"
+				},
+				"folderPath": "Data_Maps",
+				"container": "raw"
+			},
+			"range": {
+				"value": "@dataset().Range",
+				"type": "Expression"
+			},
+			"firstRowAsHeader": true
+		},
+		"schema": [
+			{
+				"type": "String"
+			},
+			{
+				"type": "String"
+			},
+			{
+				"type": "String"
+			},
+			{
+				"type": "String"
+			},
+			{
+				"type": "String"
+			}
+		]
+	}
+}

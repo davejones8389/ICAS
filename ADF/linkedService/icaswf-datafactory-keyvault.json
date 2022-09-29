@@ -1,0 +1,11 @@
+{
+	"name": "icaswf-datafactory-keyvault",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
+	"properties": {
+		"type": "AzureKeyVault",
+		"typeProperties": {
+			"baseUrl": "https://icaswf-keyvault.vault.azure.net/"
+		},
+		"annotations": []
+	}
+}

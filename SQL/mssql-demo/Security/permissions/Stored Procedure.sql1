@@ -1,0 +1,8 @@
+declare @dynamic nvarchar(1000) = '';
+select @dynamic += char(13) + 
+    'grant execute on ' + 
+
+SCHEMA_NAME(schema_id) + '.' +  quotename(name) + ' to ' + quotename(db_name()) 
+from sys.procedures
+ 
+exec(@dynamic)

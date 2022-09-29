@@ -1,0 +1,2685 @@
+{
+	"name": "PL_Data_Maps",
+	"properties": {
+		"activities": [
+			{
+				"name": "Copy Care Org map",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Set FileName",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "ExcelSource",
+						"storeSettings": {
+							"type": "AzureBlobStorageReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						}
+					},
+					"sink": {
+						"type": "AzureSqlSink",
+						"preCopyScript": "TRUNCATE TABLE [bridgingtables].[CareOrg]",
+						"disableMetricsCollection": false
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "Source_Data_Maps",
+						"type": "DatasetReference",
+						"parameters": {
+							"SheetName": "Care Org map",
+							"Range": "A14",
+							"WorkbookName": {
+								"value": "@variables('FileName')",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "Sink_Data_Maps",
+						"type": "DatasetReference",
+						"parameters": {
+							"TableName": "CareOrg"
+						}
+					}
+				]
+			},
+			{
+				"name": "If ALL Success",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "If Condition Care Org map",
+						"dependencyConditions": [
+							"Completed"
+						]
+					},
+					{
+						"activity": "If Condition Care Sector map",
+						"dependencyConditions": [
+							"Completed"
+						]
+					},
+					{
+						"activity": "If Condition Community Team map",
+						"dependencyConditions": [
+							"Completed"
+						]
+					},
+					{
+						"activity": "If Condition POD map",
+						"dependencyConditions": [
+							"Completed"
+						]
+					},
+					{
+						"activity": "If Condition Site map",
+						"dependencyConditions": [
+							"Completed"
+						]
+					},
+					{
+						"activity": "If Condition Specialty map",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@and(equals(activity('Copy Care Org map').output.executionDetails[0].status,'Succeeded'),\nand(equals(activity('Copy Care Sector map').output.executionDetails[0].status,'Succeeded'),\nand(equals(activity('Copy Community Team map').output.executionDetails[0].status,'Succeeded'),\nand(equals(activity('Copy POD map').output.executionDetails[0].status,'Succeeded'),\nand(equals(activity('Copy Site map').output.executionDetails[0].status,'Succeeded'),\nequals(activity('Copy Specialty map').output.executionDetails[0].status,'Succeeded')\n)))))",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "Excel to Error",
+							"type": "WebActivity",
+							"dependsOn": [
+								{
+									"activity": "Send email for failed upload",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"url": "https://icaswf-logicapp.azurewebsites.net:443/api/ArchiveFile/triggers/manual/invoke?api-version=2020-05-01-preview&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=kfw4vA54VezMetdLbOER9LIlZxmrEopbv8QIfMU5Zm0",
+								"method": "POST",
+								"body": {
+									"value": "{\n  \"SourceContainer\": \"raw\",\n  \"TargetContainer\": \"error\",\n  \"SourceFolder\":\"Data_Maps\",\n  \"TargetFolder\":\"Data_Maps\",\n  \"SourceFileName\": \"@{variables('FileName')}\",\n  \"TargetFileName\": \"@{concat(replace(variables('FileName'),'.xlsx','_'), formatDateTime(convertTimeZone(utcnow(),'UTC','GMT Standard Time'),'yyyy-MM-ddTHHmm'), '.xlsx')}\"\n }",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Send email for failed upload",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "PL_SendEmailNotification_Generic",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"NotificationMailAddressList": {
+										"value": "@pipeline().parameters.NotificationMailAddressList",
+										"type": "Expression"
+									},
+									"ParentPipelineName": "PL_Data_Maps",
+									"ParentPipelineStatus": "Failed",
+									"MessageContentSP": "EMailNotification_PLDataMaps",
+									"MessageSubject": "Data Maps Upload Summary",
+									"ParentPipelineRunId": {
+										"value": "@pipeline().RunId",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					],
+					"ifTrueActivities": [
+						{
+							"name": "Excel to Processed",
+							"type": "WebActivity",
+							"dependsOn": [
+								{
+									"activity": "Send email for successful upload",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"url": "https://icaswf-logicapp.azurewebsites.net:443/api/ArchiveFile/triggers/manual/invoke?api-version=2020-05-01-preview&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=kfw4vA54VezMetdLbOER9LIlZxmrEopbv8QIfMU5Zm0",
+								"method": "POST",
+								"body": {
+									"value": "{\n  \"SourceContainer\": \"raw\",\n  \"TargetContainer\": \"processed\",\n  \"SourceFolder\":\"Data_Maps\",\n  \"TargetFolder\":\"Data_Maps\",\n  \"SourceFileName\": \"@{variables('FileName')}\",\n  \"TargetFileName\": \"@{concat(replace(variables('FileName'),'.xlsx','_'), formatDateTime(convertTimeZone(utcnow(),'UTC','GMT Standard Time'),'yyyy-MM-ddTHHmm'), '.xlsx')}\"\n }",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Send email for successful upload",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "PL_SendEmailNotification_Generic",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"NotificationMailAddressList": {
+										"value": "@pipeline().parameters.NotificationMailAddressList",
+										"type": "Expression"
+									},
+									"ParentPipelineName": {
+										"value": "@pipeline().Pipeline",
+										"type": "Expression"
+									},
+									"ParentPipelineStatus": "Success",
+									"MessageContentSP": "EMailNotification_PLDataMaps",
+									"MessageSubject": "Data Maps Upload Summary",
+									"ParentPipelineRunId": {
+										"value": "@pipeline().RunId",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "Execute Controller Procedures Pipeline_copy1",
+							"type": "ExecutePipeline",
+							"dependsOn": [
+								{
+									"activity": "Excel to Processed",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "PL_FinancialYear_Check",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"ProcedureGroup": "Controller",
+									"ProcedureGroupStartRunID": "1",
+									"ProcedureGroupEndRunID": "5",
+									"ParentPipeline": {
+										"value": "@pipeline().Pipeline",
+										"type": "Expression"
+									},
+									"NotificationMailAddressList": "carsten.adams@kpmg.co.uk",
+									"SendNotificationMail": true,
+									"ContinueFromLastProcedureFailure": false
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Set FileName",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "FileName",
+					"value": {
+						"value": "@pipeline().parameters.TriggeringFile",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "If Condition Care Org map",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "Copy Care Org map",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@equals(activity('Copy Care Org map').output.executionDetails[0].status,'Succeeded')\n\n",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "Log Error Care Org map",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[audit].[sp_UpdateErrorTable]",
+								"storedProcedureParameters": {
+									"copyDuration_in_secs": {
+										"value": {
+											"value": "@{activity('Copy Care Org map').output.copyDuration}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"DataFactory_Name": {
+										"value": {
+											"value": "@{pipeline().DataFactory}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Destination": {
+										"value": "bridgingtables.CareOrg",
+										"type": "String"
+									},
+									"effectiveIntegrationRuntime": {
+										"value": {
+											"value": "@{activity('Copy Care Org map').output.effectiveIntegrationRuntime}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"ErrorCode": {
+										"value": {
+											"value": "@{activity('Copy Care Org map').error.errorCode}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"ErrorDescription": {
+										"value": {
+											"value": "@{activity('Copy Care Org map').error.message}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"ErrorLoggedTime": {
+										"value": {
+											"value": "@utcnow()",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Execution_Status": {
+										"value": {
+											"value": "@{activity('Copy Care Org map').output.executionDetails[0].status}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"FailureType": {
+										"value": {
+											"value": "@concat(activity('Copy Care Org map').error.message,'failureType:',activity('Copy Care Org map').error.failureType)",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"No_ParallelCopies": {
+										"value": {
+											"value": "@{activity('Copy Care Org map').output.usedParallelCopies}",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"Pipeline_Name": {
+										"value": {
+											"value": "@{pipeline().Pipeline}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"RunId": {
+										"value": {
+											"value": "@{pipeline().RunId}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Sink_Type": {
+										"value": {
+											"value": "@{activity('Copy Care Org map').output.executionDetails[0].sink.type}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Source": {
+										"value": {
+											"value": "@variables('FileName')",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Source_Type": {
+										"value": {
+											"value": "@{activity('Copy Care Org map').output.executionDetails[0].source.type}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerId": {
+										"value": {
+											"value": "@{pipeline().TriggerId}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerName": {
+										"value": {
+											"value": "@{pipeline().TriggerName}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerTime": {
+										"value": {
+											"value": "@{pipeline().TriggerTime}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerType": {
+										"value": {
+											"value": "@{pipeline().TriggerType}",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "icaswf_datafactory_development_database",
+								"type": "LinkedServiceReference"
+							}
+						}
+					],
+					"ifTrueActivities": [
+						{
+							"name": "Log Copy Care Org map",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[audit].[sp_UpdateLogTable]",
+								"storedProcedureParameters": {
+									"CopyActivity_End_Time": {
+										"value": {
+											"value": "@{utcnow()}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"CopyActivity_queuingDuration_in_secs": {
+										"value": {
+											"value": "@{activity('Copy Care Org map').output.executionDetails[0]. detailedDurations.queuingDuration}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"CopyActivity_Start_Time": {
+										"value": {
+											"value": "@{activity('Copy Care Org map').output.executionDetails[0].start}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"CopyActivity_transferDuration_in_secs": {
+										"value": {
+											"value": "@{activity('Copy Care Org map').output.executionDetails[0]. detailedDurations.transferDuration}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"copyDuration_in_secs": {
+										"value": {
+											"value": "@{activity('Copy Care Org map').output.copyDuration}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"DataFactory_Name": {
+										"value": {
+											"value": "@{pipeline().DataFactory}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"DataRead": {
+										"value": {
+											"value": "@activity('Copy Care Org map').output.rowsRead",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"Destination": {
+										"value": "bridgingtables.CareOrg",
+										"type": "String"
+									},
+									"effectiveIntegrationRuntime": {
+										"value": {
+											"value": "@{activity('Copy Care Org map').output.effectiveIntegrationRuntime}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Execution_Status": {
+										"value": {
+											"value": "@{activity('Copy Care Org map').output.executionDetails[0].status}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"No_ParallelCopies": {
+										"value": {
+											"value": "@{activity('Copy Care Org map').output.usedParallelCopies}",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"Pipeline_Name": {
+										"value": {
+											"value": "@{pipeline().Pipeline}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"rowsCopied": {
+										"value": {
+											"value": "@activity('Copy Care Org map').output.rowsCopied",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"RunID": {
+										"value": {
+											"value": "@{pipeline().RunId}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Sink_Type": {
+										"value": {
+											"value": "@{activity('Copy Care Org map').output.executionDetails[0].sink.type}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Source": {
+										"value": {
+											"value": "@variables('FileName')",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Source_Type": {
+										"value": {
+											"value": "@{activity('Copy Care Org map').output.executionDetails[0].source.type}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerId": {
+										"value": {
+											"value": "@{pipeline().TriggerId}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerName": {
+										"value": {
+											"value": "@{pipeline().TriggerName}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerTime": {
+										"value": {
+											"value": "@{pipeline().TriggerTime}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerType": {
+										"value": {
+											"value": "@{pipeline().TriggerType}",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "icaswf_datafactory_development_database",
+								"type": "LinkedServiceReference"
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Copy Care Sector map",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Set FileName",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "ExcelSource",
+						"storeSettings": {
+							"type": "AzureBlobStorageReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						}
+					},
+					"sink": {
+						"type": "AzureSqlSink",
+						"preCopyScript": "TRUNCATE TABLE [bridgingtables].[CareSector]",
+						"disableMetricsCollection": false
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "Source_Data_Maps",
+						"type": "DatasetReference",
+						"parameters": {
+							"SheetName": "Care Sector map",
+							"Range": "A17",
+							"WorkbookName": {
+								"value": "@variables('FileName')",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "Sink_Data_Maps",
+						"type": "DatasetReference",
+						"parameters": {
+							"TableName": "CareSector"
+						}
+					}
+				]
+			},
+			{
+				"name": "If Condition Care Sector map",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "Copy Care Sector map",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@equals(activity('Copy Care Sector map').output.executionDetails[0].status,'Succeeded')\n\n",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "Log Error Care Sector map",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[audit].[sp_UpdateErrorTable]",
+								"storedProcedureParameters": {
+									"copyDuration_in_secs": {
+										"value": {
+											"value": "@{activity('Copy Care Sector map').output.copyDuration}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"DataFactory_Name": {
+										"value": {
+											"value": "@{pipeline().DataFactory}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Destination": {
+										"value": "bridgingtables.CareSector",
+										"type": "String"
+									},
+									"effectiveIntegrationRuntime": {
+										"value": {
+											"value": "@{activity('Copy Care Sector map').output.effectiveIntegrationRuntime}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"ErrorCode": {
+										"value": {
+											"value": "@{activity('Copy Care Sector map').error.errorCode}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"ErrorDescription": {
+										"value": {
+											"value": "@{activity('Copy Care Sector map').error.message}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"ErrorLoggedTime": {
+										"value": {
+											"value": "@utcnow()",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Execution_Status": {
+										"value": {
+											"value": "@{activity('Copy Care Sector map').output.executionDetails[0].status}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"FailureType": {
+										"value": {
+											"value": "@concat(activity('Copy Care Sector map').error.message,'failureType:',activity('Copy Care Sector map').error.failureType)",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"No_ParallelCopies": {
+										"value": {
+											"value": "@{activity('Copy Care Sector map').output.usedParallelCopies}",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"Pipeline_Name": {
+										"value": {
+											"value": "@{pipeline().Pipeline}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"RunId": {
+										"value": {
+											"value": "@{pipeline().RunId}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Sink_Type": {
+										"value": {
+											"value": "@{activity('Copy Care Sector map').output.executionDetails[0].sink.type}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Source": {
+										"value": {
+											"value": "@variables('FileName')",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Source_Type": {
+										"value": {
+											"value": "@{activity('Copy Care Sector map').output.executionDetails[0].source.type}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerId": {
+										"value": {
+											"value": "@{pipeline().TriggerId}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerName": {
+										"value": {
+											"value": "@{pipeline().TriggerName}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerTime": {
+										"value": {
+											"value": "@{pipeline().TriggerTime}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerType": {
+										"value": {
+											"value": "@{pipeline().TriggerType}",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "icaswf_datafactory_development_database",
+								"type": "LinkedServiceReference"
+							}
+						}
+					],
+					"ifTrueActivities": [
+						{
+							"name": "Log Copy Care Sector map",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[audit].[sp_UpdateLogTable]",
+								"storedProcedureParameters": {
+									"CopyActivity_End_Time": {
+										"value": {
+											"value": "@{utcnow()}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"CopyActivity_queuingDuration_in_secs": {
+										"value": {
+											"value": "@{activity('Copy Care Sector map').output.executionDetails[0]. detailedDurations.queuingDuration}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"CopyActivity_Start_Time": {
+										"value": {
+											"value": "@{activity('Copy Care Sector map').output.executionDetails[0].start}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"CopyActivity_transferDuration_in_secs": {
+										"value": {
+											"value": "@{activity('Copy Care Sector map').output.executionDetails[0]. detailedDurations.transferDuration}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"copyDuration_in_secs": {
+										"value": {
+											"value": "@{activity('Copy Care Sector map').output.copyDuration}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"DataFactory_Name": {
+										"value": {
+											"value": "@{pipeline().DataFactory}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"DataRead": {
+										"value": {
+											"value": "@activity('Copy Care Sector map').output.rowsRead",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"Destination": {
+										"value": "bridgingtables.CareSector",
+										"type": "String"
+									},
+									"effectiveIntegrationRuntime": {
+										"value": {
+											"value": "@{activity('Copy Care Sector map').output.effectiveIntegrationRuntime}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Execution_Status": {
+										"value": {
+											"value": "@{activity('Copy Care Sector map').output.executionDetails[0].status}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"No_ParallelCopies": {
+										"value": {
+											"value": "@{activity('Copy Care Sector map').output.usedParallelCopies}",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"Pipeline_Name": {
+										"value": {
+											"value": "@{pipeline().Pipeline}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"rowsCopied": {
+										"value": {
+											"value": "@activity('Copy Care Sector map').output.rowsCopied",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"RunID": {
+										"value": {
+											"value": "@{pipeline().RunId}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Sink_Type": {
+										"value": {
+											"value": "@{activity('Copy Care Sector map').output.executionDetails[0].sink.type}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Source": {
+										"value": {
+											"value": "@variables('FileName')",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Source_Type": {
+										"value": {
+											"value": "@{activity('Copy Care Sector map').output.executionDetails[0].source.type}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerId": {
+										"value": {
+											"value": "@{pipeline().TriggerId}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerName": {
+										"value": {
+											"value": "@{pipeline().TriggerName}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerTime": {
+										"value": {
+											"value": "@{pipeline().TriggerTime}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerType": {
+										"value": {
+											"value": "@{pipeline().TriggerType}",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "icaswf_datafactory_development_database",
+								"type": "LinkedServiceReference"
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Copy Community Team map",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Set FileName",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "ExcelSource",
+						"storeSettings": {
+							"type": "AzureBlobStorageReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						}
+					},
+					"sink": {
+						"type": "AzureSqlSink",
+						"preCopyScript": "TRUNCATE TABLE [bridgingtables].[CommunityCC]",
+						"disableMetricsCollection": false
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "Source_Data_Maps",
+						"type": "DatasetReference",
+						"parameters": {
+							"SheetName": "Community Team map",
+							"Range": "A16",
+							"WorkbookName": {
+								"value": "@variables('FileName')",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "Sink_Data_Maps",
+						"type": "DatasetReference",
+						"parameters": {
+							"TableName": "CommunityCC"
+						}
+					}
+				]
+			},
+			{
+				"name": "If Condition Community Team map",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "Copy Community Team map",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@equals(activity('Copy Community Team map').output.executionDetails[0].status,'Succeeded')\n\n",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "Log Error Community Team map",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[audit].[sp_UpdateErrorTable]",
+								"storedProcedureParameters": {
+									"copyDuration_in_secs": {
+										"value": {
+											"value": "@{activity('Copy Community Team map').output.copyDuration}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"DataFactory_Name": {
+										"value": {
+											"value": "@{pipeline().DataFactory}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Destination": {
+										"value": "bridgingtables.CommunityCC",
+										"type": "String"
+									},
+									"effectiveIntegrationRuntime": {
+										"value": {
+											"value": "@{activity('Copy Community Team map').output.effectiveIntegrationRuntime}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"ErrorCode": {
+										"value": {
+											"value": "@{activity('Copy Community Team map').error.errorCode}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"ErrorDescription": {
+										"value": {
+											"value": "@{activity('Copy Community Team map').error.message}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"ErrorLoggedTime": {
+										"value": {
+											"value": "@utcnow()",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Execution_Status": {
+										"value": {
+											"value": "@{activity('Copy Community Team map').output.executionDetails[0].status}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"FailureType": {
+										"value": {
+											"value": "@concat(activity('Copy Community Team map').error.message,'failureType:',activity('Copy Community Team map').error.failureType)",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"No_ParallelCopies": {
+										"value": {
+											"value": "@{activity('Copy Community Team map').output.usedParallelCopies}",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"Pipeline_Name": {
+										"value": {
+											"value": "@{pipeline().Pipeline}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"RunId": {
+										"value": {
+											"value": "@{pipeline().RunId}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Sink_Type": {
+										"value": {
+											"value": "@{activity('Copy Community Team map').output.executionDetails[0].sink.type}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Source": {
+										"value": {
+											"value": "@variables('FileName')",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Source_Type": {
+										"value": {
+											"value": "@{activity('Copy Community Team map').output.executionDetails[0].source.type}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerId": {
+										"value": {
+											"value": "@{pipeline().TriggerId}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerName": {
+										"value": {
+											"value": "@{pipeline().TriggerName}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerTime": {
+										"value": {
+											"value": "@{pipeline().TriggerTime}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerType": {
+										"value": {
+											"value": "@{pipeline().TriggerType}",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "icaswf_datafactory_development_database",
+								"type": "LinkedServiceReference"
+							}
+						}
+					],
+					"ifTrueActivities": [
+						{
+							"name": "Log Copy Community Team map",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[audit].[sp_UpdateLogTable]",
+								"storedProcedureParameters": {
+									"CopyActivity_End_Time": {
+										"value": {
+											"value": "@{utcnow()}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"CopyActivity_queuingDuration_in_secs": {
+										"value": {
+											"value": "@{activity('Copy Community Team map').output.executionDetails[0]. detailedDurations.queuingDuration}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"CopyActivity_Start_Time": {
+										"value": {
+											"value": "@{activity('Copy Community Team map').output.executionDetails[0].start}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"CopyActivity_transferDuration_in_secs": {
+										"value": {
+											"value": "@{activity('Copy Community Team map').output.executionDetails[0]. detailedDurations.transferDuration}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"copyDuration_in_secs": {
+										"value": {
+											"value": "@{activity('Copy Community Team map').output.copyDuration}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"DataFactory_Name": {
+										"value": {
+											"value": "@{pipeline().DataFactory}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"DataRead": {
+										"value": {
+											"value": "@activity('Copy Community Team map').output.rowsRead",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"Destination": {
+										"value": "bridgingtables.CommunityCC",
+										"type": "String"
+									},
+									"effectiveIntegrationRuntime": {
+										"value": {
+											"value": "@{activity('Copy Community Team map').output.effectiveIntegrationRuntime}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Execution_Status": {
+										"value": {
+											"value": "@{activity('Copy Community Team map').output.executionDetails[0].status}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"No_ParallelCopies": {
+										"value": {
+											"value": "@{activity('Copy Community Team map').output.usedParallelCopies}",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"Pipeline_Name": {
+										"value": {
+											"value": "@{pipeline().Pipeline}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"rowsCopied": {
+										"value": {
+											"value": "@activity('Copy Community Team map').output.rowsCopied",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"RunID": {
+										"value": {
+											"value": "@{pipeline().RunId}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Sink_Type": {
+										"value": {
+											"value": "@{activity('Copy Community Team map').output.executionDetails[0].sink.type}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Source": {
+										"value": {
+											"value": "@variables('FileName')",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Source_Type": {
+										"value": {
+											"value": "@{activity('Copy Community Team map').output.executionDetails[0].source.type}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerId": {
+										"value": {
+											"value": "@{pipeline().TriggerId}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerName": {
+										"value": {
+											"value": "@{pipeline().TriggerName}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerTime": {
+										"value": {
+											"value": "@{pipeline().TriggerTime}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerType": {
+										"value": {
+											"value": "@{pipeline().TriggerType}",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "icaswf_datafactory_development_database",
+								"type": "LinkedServiceReference"
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Copy POD map",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Set FileName",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "ExcelSource",
+						"storeSettings": {
+							"type": "AzureBlobStorageReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						}
+					},
+					"sink": {
+						"type": "AzureSqlSink",
+						"preCopyScript": "TRUNCATE TABLE [bridgingtables].[POD]",
+						"disableMetricsCollection": false
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "Source_Data_Maps",
+						"type": "DatasetReference",
+						"parameters": {
+							"SheetName": "POD map",
+							"Range": "A14",
+							"WorkbookName": {
+								"value": "@variables('FileName')",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "Sink_Data_Maps",
+						"type": "DatasetReference",
+						"parameters": {
+							"TableName": "POD"
+						}
+					}
+				]
+			},
+			{
+				"name": "If Condition POD map",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "Copy POD map",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@equals(activity('Copy POD map').output.executionDetails[0].status,'Succeeded')\n\n",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "Log Error POD map",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[audit].[sp_UpdateErrorTable]",
+								"storedProcedureParameters": {
+									"copyDuration_in_secs": {
+										"value": {
+											"value": "@{activity('Copy POD map').output.copyDuration}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"DataFactory_Name": {
+										"value": {
+											"value": "@{pipeline().DataFactory}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Destination": {
+										"value": "bridgingtables.POD",
+										"type": "String"
+									},
+									"effectiveIntegrationRuntime": {
+										"value": {
+											"value": "@{activity('Copy POD map').output.effectiveIntegrationRuntime}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"ErrorCode": {
+										"value": {
+											"value": "@{activity('Copy POD map').error.errorCode}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"ErrorDescription": {
+										"value": {
+											"value": "@{activity('Copy POD map').error.message}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"ErrorLoggedTime": {
+										"value": {
+											"value": "@utcnow()",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Execution_Status": {
+										"value": {
+											"value": "@{activity('Copy POD map').output.executionDetails[0].status}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"FailureType": {
+										"value": {
+											"value": "@concat(activity('Copy POD map').error.message,'failureType:',activity('Copy POD map').error.failureType)",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"No_ParallelCopies": {
+										"value": {
+											"value": "@{activity('Copy POD map').output.usedParallelCopies}",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"Pipeline_Name": {
+										"value": {
+											"value": "@{pipeline().Pipeline}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"RunId": {
+										"value": {
+											"value": "@{pipeline().RunId}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Sink_Type": {
+										"value": {
+											"value": "@{activity('Copy POD map').output.executionDetails[0].sink.type}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Source": {
+										"value": {
+											"value": "@variables('FileName')",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Source_Type": {
+										"value": {
+											"value": "@{activity('Copy POD map').output.executionDetails[0].source.type}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerId": {
+										"value": {
+											"value": "@{pipeline().TriggerId}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerName": {
+										"value": {
+											"value": "@{pipeline().TriggerName}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerTime": {
+										"value": {
+											"value": "@{pipeline().TriggerTime}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerType": {
+										"value": {
+											"value": "@{pipeline().TriggerType}",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "icaswf_datafactory_development_database",
+								"type": "LinkedServiceReference"
+							}
+						}
+					],
+					"ifTrueActivities": [
+						{
+							"name": "Log Copy POD map",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[audit].[sp_UpdateLogTable]",
+								"storedProcedureParameters": {
+									"CopyActivity_End_Time": {
+										"value": {
+											"value": "@{utcnow()}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"CopyActivity_queuingDuration_in_secs": {
+										"value": {
+											"value": "@{activity('Copy POD map').output.executionDetails[0]. detailedDurations.queuingDuration}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"CopyActivity_Start_Time": {
+										"value": {
+											"value": "@{activity('Copy POD map').output.executionDetails[0].start}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"CopyActivity_transferDuration_in_secs": {
+										"value": {
+											"value": "@{activity('Copy POD map').output.executionDetails[0]. detailedDurations.transferDuration}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"copyDuration_in_secs": {
+										"value": {
+											"value": "@{activity('Copy POD map').output.copyDuration}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"DataFactory_Name": {
+										"value": {
+											"value": "@{pipeline().DataFactory}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"DataRead": {
+										"value": {
+											"value": "@activity('Copy POD map').output.rowsRead",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"Destination": {
+										"value": "bridgingtables.POD",
+										"type": "String"
+									},
+									"effectiveIntegrationRuntime": {
+										"value": {
+											"value": "@{activity('Copy POD map').output.effectiveIntegrationRuntime}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Execution_Status": {
+										"value": {
+											"value": "@{activity('Copy POD map').output.executionDetails[0].status}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"No_ParallelCopies": {
+										"value": {
+											"value": "@{activity('Copy POD map').output.usedParallelCopies}",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"Pipeline_Name": {
+										"value": {
+											"value": "@{pipeline().Pipeline}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"rowsCopied": {
+										"value": {
+											"value": "@activity('Copy POD map').output.rowsCopied",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"RunID": {
+										"value": {
+											"value": "@{pipeline().RunId}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Sink_Type": {
+										"value": {
+											"value": "@{activity('Copy POD map').output.executionDetails[0].sink.type}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Source": {
+										"value": {
+											"value": "@variables('FileName')",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Source_Type": {
+										"value": {
+											"value": "@{activity('Copy POD map').output.executionDetails[0].source.type}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerId": {
+										"value": {
+											"value": "@{pipeline().TriggerId}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerName": {
+										"value": {
+											"value": "@{pipeline().TriggerName}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerTime": {
+										"value": {
+											"value": "@{pipeline().TriggerTime}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerType": {
+										"value": {
+											"value": "@{pipeline().TriggerType}",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "icaswf_datafactory_development_database",
+								"type": "LinkedServiceReference"
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Copy Site map",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Set FileName",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "ExcelSource",
+						"storeSettings": {
+							"type": "AzureBlobStorageReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						}
+					},
+					"sink": {
+						"type": "AzureSqlSink",
+						"preCopyScript": "TRUNCATE TABLE [bridgingtables].[Site]",
+						"disableMetricsCollection": false
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "Source_Data_Maps",
+						"type": "DatasetReference",
+						"parameters": {
+							"SheetName": "Site map",
+							"Range": "A14",
+							"WorkbookName": {
+								"value": "@variables('FileName')",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "Sink_Data_Maps",
+						"type": "DatasetReference",
+						"parameters": {
+							"TableName": "Site"
+						}
+					}
+				]
+			},
+			{
+				"name": "If Condition Site map",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "Copy Site map",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@equals(activity('Copy Site map').output.executionDetails[0].status,'Succeeded')\n\n",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "Log Error Site map",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[audit].[sp_UpdateErrorTable]",
+								"storedProcedureParameters": {
+									"copyDuration_in_secs": {
+										"value": {
+											"value": "@{activity('Copy Site map').output.copyDuration}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"DataFactory_Name": {
+										"value": {
+											"value": "@{pipeline().DataFactory}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Destination": {
+										"value": "bridgingtables.Site",
+										"type": "String"
+									},
+									"effectiveIntegrationRuntime": {
+										"value": {
+											"value": "@{activity('Copy Site map').output.effectiveIntegrationRuntime}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"ErrorCode": {
+										"value": {
+											"value": "@{activity('Copy Site map').error.errorCode}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"ErrorDescription": {
+										"value": {
+											"value": "@{activity('Copy Site map').error.message}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"ErrorLoggedTime": {
+										"value": {
+											"value": "@utcnow()",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Execution_Status": {
+										"value": {
+											"value": "@{activity('Copy Site map').output.executionDetails[0].status}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"FailureType": {
+										"value": {
+											"value": "@concat(activity('Copy Site map').error.message,'failureType:',activity('Copy Site map').error.failureType)",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"No_ParallelCopies": {
+										"value": {
+											"value": "@{activity('Copy Site map').output.usedParallelCopies}",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"Pipeline_Name": {
+										"value": {
+											"value": "@{pipeline().Pipeline}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"RunId": {
+										"value": {
+											"value": "@{pipeline().RunId}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Sink_Type": {
+										"value": {
+											"value": "@{activity('Copy Site map').output.executionDetails[0].sink.type}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Source": {
+										"value": {
+											"value": "@variables('FileName')",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Source_Type": {
+										"value": {
+											"value": "@{activity('Copy Site map').output.executionDetails[0].source.type}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerId": {
+										"value": {
+											"value": "@{pipeline().TriggerId}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerName": {
+										"value": {
+											"value": "@{pipeline().TriggerName}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerTime": {
+										"value": {
+											"value": "@{pipeline().TriggerTime}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerType": {
+										"value": {
+											"value": "@{pipeline().TriggerType}",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "icaswf_datafactory_development_database",
+								"type": "LinkedServiceReference"
+							}
+						}
+					],
+					"ifTrueActivities": [
+						{
+							"name": "Log Copy Site map",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[audit].[sp_UpdateLogTable]",
+								"storedProcedureParameters": {
+									"CopyActivity_End_Time": {
+										"value": {
+											"value": "@{utcnow()}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"CopyActivity_queuingDuration_in_secs": {
+										"value": {
+											"value": "@{activity('Copy Site map').output.executionDetails[0]. detailedDurations.queuingDuration}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"CopyActivity_Start_Time": {
+										"value": {
+											"value": "@{activity('Copy Site map').output.executionDetails[0].start}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"CopyActivity_transferDuration_in_secs": {
+										"value": {
+											"value": "@{activity('Copy Site map').output.executionDetails[0]. detailedDurations.transferDuration}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"copyDuration_in_secs": {
+										"value": {
+											"value": "@{activity('Copy Site map').output.copyDuration}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"DataFactory_Name": {
+										"value": {
+											"value": "@{pipeline().DataFactory}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"DataRead": {
+										"value": {
+											"value": "@activity('Copy Site map').output.rowsRead",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"Destination": {
+										"value": "bridgingtables.Site",
+										"type": "String"
+									},
+									"effectiveIntegrationRuntime": {
+										"value": {
+											"value": "@{activity('Copy Site map').output.effectiveIntegrationRuntime}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Execution_Status": {
+										"value": {
+											"value": "@{activity('Copy Site map').output.executionDetails[0].status}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"No_ParallelCopies": {
+										"value": {
+											"value": "@{activity('Copy Site map').output.usedParallelCopies}",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"Pipeline_Name": {
+										"value": {
+											"value": "@{pipeline().Pipeline}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"rowsCopied": {
+										"value": {
+											"value": "@activity('Copy Site map').output.rowsCopied",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"RunID": {
+										"value": {
+											"value": "@{pipeline().RunId}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Sink_Type": {
+										"value": {
+											"value": "@{activity('Copy Site map').output.executionDetails[0].sink.type}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Source": {
+										"value": {
+											"value": "@variables('FileName')",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Source_Type": {
+										"value": {
+											"value": "@{activity('Copy Site map').output.executionDetails[0].source.type}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerId": {
+										"value": {
+											"value": "@{pipeline().TriggerId}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerName": {
+										"value": {
+											"value": "@{pipeline().TriggerName}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerTime": {
+										"value": {
+											"value": "@{pipeline().TriggerTime}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerType": {
+										"value": {
+											"value": "@{pipeline().TriggerType}",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "icaswf_datafactory_development_database",
+								"type": "LinkedServiceReference"
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Copy Specialty map",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Set FileName",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "ExcelSource",
+						"storeSettings": {
+							"type": "AzureBlobStorageReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						}
+					},
+					"sink": {
+						"type": "AzureSqlSink",
+						"preCopyScript": "TRUNCATE TABLE [bridgingtables].[Specialty]",
+						"disableMetricsCollection": false
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "Source_Data_Maps",
+						"type": "DatasetReference",
+						"parameters": {
+							"SheetName": "Specialty map",
+							"Range": "A14",
+							"WorkbookName": {
+								"value": "@variables('FileName')",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "Sink_Data_Maps",
+						"type": "DatasetReference",
+						"parameters": {
+							"TableName": "Specialty"
+						}
+					}
+				]
+			},
+			{
+				"name": "If Condition Specialty map",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "Copy Specialty map",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@equals(activity('Copy Specialty map').output.executionDetails[0].status,'Succeeded')\n\n",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "Log Error Specialty  map",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[audit].[sp_UpdateErrorTable]",
+								"storedProcedureParameters": {
+									"copyDuration_in_secs": {
+										"value": {
+											"value": "@{activity('Copy Specialty map').output.copyDuration}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"DataFactory_Name": {
+										"value": {
+											"value": "@{pipeline().DataFactory}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Destination": {
+										"value": "bridgingtables.Specialty",
+										"type": "String"
+									},
+									"effectiveIntegrationRuntime": {
+										"value": {
+											"value": "@{activity('Copy Specialty map').output.effectiveIntegrationRuntime}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"ErrorCode": {
+										"value": {
+											"value": "@{activity('Copy Specialty map').error.errorCode}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"ErrorDescription": {
+										"value": {
+											"value": "@{activity('Copy Specialty map').error.message}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"ErrorLoggedTime": {
+										"value": {
+											"value": "@utcnow()",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Execution_Status": {
+										"value": {
+											"value": "@{activity('Copy Specialty map').output.executionDetails[0].status}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"FailureType": {
+										"value": {
+											"value": "@concat(activity('Copy Specialty map').error.message,'failureType:',activity('Copy Specialty map').error.failureType)",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"No_ParallelCopies": {
+										"value": {
+											"value": "@{activity('Copy Specialty map').output.usedParallelCopies}",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"Pipeline_Name": {
+										"value": {
+											"value": "@{pipeline().Pipeline}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"RunId": {
+										"value": {
+											"value": "@{pipeline().RunId}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Sink_Type": {
+										"value": {
+											"value": "@{activity('Copy Specialty map').output.executionDetails[0].sink.type}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Source": {
+										"value": {
+											"value": "@variables('FileName')",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Source_Type": {
+										"value": {
+											"value": "@{activity('Copy Specialty map').output.executionDetails[0].source.type}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerId": {
+										"value": {
+											"value": "@{pipeline().TriggerId}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerName": {
+										"value": {
+											"value": "@{pipeline().TriggerName}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerTime": {
+										"value": {
+											"value": "@{pipeline().TriggerTime}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerType": {
+										"value": {
+											"value": "@{pipeline().TriggerType}",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "icaswf_datafactory_development_database",
+								"type": "LinkedServiceReference"
+							}
+						}
+					],
+					"ifTrueActivities": [
+						{
+							"name": "Log Copy Specialty map",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[audit].[sp_UpdateLogTable]",
+								"storedProcedureParameters": {
+									"CopyActivity_End_Time": {
+										"value": {
+											"value": "@{utcnow()}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"CopyActivity_queuingDuration_in_secs": {
+										"value": {
+											"value": "@{activity('Copy Specialty map').output.executionDetails[0]. detailedDurations.queuingDuration}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"CopyActivity_Start_Time": {
+										"value": {
+											"value": "@{activity('Copy Specialty map').output.executionDetails[0].start}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"CopyActivity_transferDuration_in_secs": {
+										"value": {
+											"value": "@{activity('Copy Specialty map').output.executionDetails[0]. detailedDurations.transferDuration}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"copyDuration_in_secs": {
+										"value": {
+											"value": "@{activity('Copy Specialty map').output.copyDuration}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"DataFactory_Name": {
+										"value": {
+											"value": "@{pipeline().DataFactory}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"DataRead": {
+										"value": {
+											"value": "@activity('Copy Specialty map').output.rowsRead",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"Destination": {
+										"value": "bridgingtables.Specialty",
+										"type": "String"
+									},
+									"effectiveIntegrationRuntime": {
+										"value": {
+											"value": "@{activity('Copy Specialty map').output.effectiveIntegrationRuntime}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Execution_Status": {
+										"value": {
+											"value": "@{activity('Copy Specialty map').output.executionDetails[0].status}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"No_ParallelCopies": {
+										"value": {
+											"value": "@{activity('Copy Specialty map').output.usedParallelCopies}",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"Pipeline_Name": {
+										"value": {
+											"value": "@{pipeline().Pipeline}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"rowsCopied": {
+										"value": {
+											"value": "@activity('Copy Specialty map').output.rowsCopied",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"RunID": {
+										"value": {
+											"value": "@{pipeline().RunId}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Sink_Type": {
+										"value": {
+											"value": "@{activity('Copy Specialty map').output.executionDetails[0].sink.type}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Source": {
+										"value": {
+											"value": "@variables('FileName')",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Source_Type": {
+										"value": {
+											"value": "@{activity('Copy Specialty map').output.executionDetails[0].source.type}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerId": {
+										"value": {
+											"value": "@{pipeline().TriggerId}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerName": {
+										"value": {
+											"value": "@{pipeline().TriggerName}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerTime": {
+										"value": {
+											"value": "@{pipeline().TriggerTime}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TriggerType": {
+										"value": {
+											"value": "@{pipeline().TriggerType}",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "icaswf_datafactory_development_database",
+								"type": "LinkedServiceReference"
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"TriggeringFile": {
+				"type": "string",
+				"defaultValue": "@triggerBody().fileName"
+			},
+			"NotificationMailAddressList": {
+				"type": "string",
+				"defaultValue": "carsten.adams@kpmg.co.uk"
+			}
+		},
+		"variables": {
+			"FileName": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "Pipeline Set 3: PL Data Maps"
+		},
+		"annotations": []
+	}
+}

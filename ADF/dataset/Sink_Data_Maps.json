@@ -1,0 +1,30 @@
+{
+	"name": "Sink_Data_Maps",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "icaswf_datafactory_development_database",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"TableName": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "DS Data Maps"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [],
+		"typeProperties": {
+			"schema": {
+				"value": "bridgingtables",
+				"type": "Expression"
+			},
+			"table": {
+				"value": "@dataset().TableName",
+				"type": "Expression"
+			}
+		}
+	}
+}

@@ -1,0 +1,111 @@
+{
+	"name": "PL_Master_File_Batch",
+	"properties": {
+		"activities": [
+			{
+				"name": "Execute Validation",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "PL_FileValidation_Batch",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"Source": {
+							"value": "@pipeline().parameters.Source",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Execute Copy to DB if exists",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Execute Validation",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "PL_CheckFolder_Batch",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"Source": {
+							"value": "@pipeline().parameters.Source",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Execute Controller Procedures",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "Execute Copy to DB if exists",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@equals(pipeline().parameters.ExecuteControllerProcedures, true)",
+						"type": "Expression"
+					},
+					"ifTrueActivities": [
+						{
+							"name": "Execute Controller Procedures Pipeline",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "PL_ProcedureCaller_Generic",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"ProcedureGroup": "Controller",
+									"ProcedureGroupStartRunID": "1",
+									"ProcedureGroupEndRunID": "6",
+									"ParentPipeline": {
+										"value": "@pipeline().Pipeline",
+										"type": "Expression"
+									},
+									"NotificationMailAddressList": "eman.abela@kpmg.co.uk",
+									"SendNotificationMail": true,
+									"ContinueFromLastProcedureFailure": true
+								}
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"Source": {
+				"type": "string"
+			},
+			"ExecuteControllerProcedures": {
+				"type": "bool",
+				"defaultValue": false
+			}
+		},
+		"folder": {
+			"name": "Discontinued"
+		},
+		"annotations": []
+	}
+}

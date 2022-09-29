@@ -1,0 +1,62 @@
+{
+	"name": "Source_SQL_Scenario_Calcs",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "icaswf_datafactory_landing_storage",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"SheetName": {
+				"type": "string"
+			},
+			"Range": {
+				"type": "string"
+			},
+			"WorkbookName": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "DS Model Outputs"
+		},
+		"annotations": [],
+		"type": "Excel",
+		"typeProperties": {
+			"sheetName": {
+				"value": "@dataset().SheetName",
+				"type": "Expression"
+			},
+			"location": {
+				"type": "AzureBlobStorageLocation",
+				"fileName": {
+					"value": "@dataset().WorkbookName",
+					"type": "Expression"
+				},
+				"folderPath": "ModelOutputs",
+				"container": "raw"
+			},
+			"range": {
+				"value": "@dataset().Range",
+				"type": "Expression"
+			},
+			"firstRowAsHeader": true
+		},
+		"schema": [
+			{
+				"type": "String"
+			},
+			{
+				"type": "String"
+			},
+			{
+				"type": "String"
+			},
+			{
+				"type": "String"
+			},
+			{
+				"type": "String"
+			}
+		]
+	}
+}

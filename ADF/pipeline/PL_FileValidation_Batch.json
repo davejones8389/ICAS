@@ -1,0 +1,688 @@
+{
+	"name": "PL_FileValidation_Batch",
+	"properties": {
+		"activities": [
+			{
+				"name": "Get Folder Metadata",
+				"type": "GetMetadata",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "DS_DataFolder",
+						"type": "DatasetReference",
+						"parameters": {
+							"Container": "raw",
+							"FolderName": {
+								"value": "@pipeline().parameters.Source",
+								"type": "Expression"
+							}
+						}
+					},
+					"fieldList": [
+						"itemName",
+						"childItems"
+					],
+					"storeSettings": {
+						"type": "AzureBlobStorageReadSettings",
+						"recursive": true,
+						"enablePartitionDiscovery": false
+					},
+					"formatSettings": {
+						"type": "DelimitedTextReadSettings"
+					}
+				}
+			},
+			{
+				"name": "For Each File Exluding StaticFile",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "For Each File in Folder",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@variables('FileList')",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "Get File Metadata",
+							"type": "GetMetadata",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"dataset": {
+									"referenceName": "DS_DataFile",
+									"type": "DatasetReference",
+									"parameters": {
+										"Container": "raw",
+										"FolderName": {
+											"value": "@activity('Get Folder Metadata').output.itemName",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@item()",
+											"type": "Expression"
+										}
+									}
+								},
+								"fieldList": [
+									"structure",
+									"itemName",
+									"columnCount",
+									"itemType",
+									"size"
+								],
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "DelimitedTextReadSettings"
+								}
+							}
+						},
+						{
+							"name": "If Condition",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "Create Audit Record",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@equals(activity('Get File Metadata').output.structure , activity('Get Template Metadata').output.structure )",
+									"type": "Expression"
+								},
+								"ifFalseActivities": [
+									{
+										"name": "Copy Error",
+										"type": "Copy",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"source": {
+												"type": "DelimitedTextSource",
+												"storeSettings": {
+													"type": "AzureBlobStorageReadSettings",
+													"recursive": true,
+													"enablePartitionDiscovery": false
+												},
+												"formatSettings": {
+													"type": "DelimitedTextReadSettings"
+												}
+											},
+											"sink": {
+												"type": "DelimitedTextSink",
+												"storeSettings": {
+													"type": "AzureBlobStorageWriteSettings"
+												},
+												"formatSettings": {
+													"type": "DelimitedTextWriteSettings",
+													"quoteAllText": true,
+													"fileExtension": ".txt"
+												}
+											},
+											"enableStaging": false,
+											"translator": {
+												"type": "TabularTranslator",
+												"typeConversion": true,
+												"typeConversionSettings": {
+													"allowDataTruncation": true,
+													"treatBooleanAsNumber": false
+												}
+											}
+										},
+										"inputs": [
+											{
+												"referenceName": "DS_DataFile",
+												"type": "DatasetReference",
+												"parameters": {
+													"Container": "raw",
+													"FolderName": {
+														"value": "@activity('Get Folder Metadata').output.itemName",
+														"type": "Expression"
+													},
+													"FileName": {
+														"value": "@activity('Get File Metadata').output.itemName",
+														"type": "Expression"
+													}
+												}
+											}
+										],
+										"outputs": [
+											{
+												"referenceName": "DS_DataFile",
+												"type": "DatasetReference",
+												"parameters": {
+													"Container": "error",
+													"FolderName": {
+														"value": "@activity('Get Folder Metadata').output.itemName",
+														"type": "Expression"
+													},
+													"FileName": {
+														"value": "@activity('Get File Metadata').output.itemName",
+														"type": "Expression"
+													}
+												}
+											}
+										]
+									},
+									{
+										"name": "Delete Raw Fail",
+										"type": "Delete",
+										"dependsOn": [
+											{
+												"activity": "Copy Error",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"dataset": {
+												"referenceName": "DS_DataFile",
+												"type": "DatasetReference",
+												"parameters": {
+													"Container": "raw",
+													"FolderName": {
+														"value": "@activity('Get Folder Metadata').output.itemName",
+														"type": "Expression"
+													},
+													"FileName": {
+														"value": "@activity('Get File Metadata').output.Itemname",
+														"type": "Expression"
+													}
+												}
+											},
+											"enableLogging": false,
+											"storeSettings": {
+												"type": "AzureBlobStorageReadSettings",
+												"recursive": true,
+												"enablePartitionDiscovery": false
+											}
+										}
+									},
+									{
+										"name": "Update Audit Failed",
+										"type": "SqlServerStoredProcedure",
+										"dependsOn": [
+											{
+												"activity": "Delete Raw Fail",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"storedProcedureName": "[audit].[UpdateADFAuditRecord]",
+											"storedProcedureParameters": {
+												"ErrorFlag": {
+													"value": "1",
+													"type": "Int32"
+												},
+												"FileName": {
+													"value": {
+														"value": "@activity('Get File Metadata').output.itemName",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"Source": {
+													"value": {
+														"value": "@pipeline().parameters.Source",
+														"type": "Expression"
+													},
+													"type": "String"
+												}
+											}
+										},
+										"linkedServiceName": {
+											"referenceName": "icaswf_datafactory_development_database",
+											"type": "LinkedServiceReference"
+										}
+									}
+								],
+								"ifTrueActivities": [
+									{
+										"name": "Copy Cleansed",
+										"type": "Copy",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"source": {
+												"type": "DelimitedTextSource",
+												"storeSettings": {
+													"type": "AzureBlobStorageReadSettings",
+													"recursive": true,
+													"enablePartitionDiscovery": false
+												},
+												"formatSettings": {
+													"type": "DelimitedTextReadSettings"
+												}
+											},
+											"sink": {
+												"type": "DelimitedTextSink",
+												"storeSettings": {
+													"type": "AzureBlobStorageWriteSettings"
+												},
+												"formatSettings": {
+													"type": "DelimitedTextWriteSettings",
+													"quoteAllText": true,
+													"fileExtension": ".txt"
+												}
+											},
+											"enableStaging": false,
+											"translator": {
+												"type": "TabularTranslator",
+												"typeConversion": true,
+												"typeConversionSettings": {
+													"allowDataTruncation": true,
+													"treatBooleanAsNumber": false
+												}
+											}
+										},
+										"inputs": [
+											{
+												"referenceName": "DS_DataFile",
+												"type": "DatasetReference",
+												"parameters": {
+													"Container": "raw",
+													"FolderName": {
+														"value": "@activity('Get Folder Metadata').output.itemName",
+														"type": "Expression"
+													},
+													"FileName": {
+														"value": "@activity('Get File Metadata').output.itemName",
+														"type": "Expression"
+													}
+												}
+											}
+										],
+										"outputs": [
+											{
+												"referenceName": "DS_DataFile",
+												"type": "DatasetReference",
+												"parameters": {
+													"Container": "cleansed",
+													"FolderName": {
+														"value": "@activity('Get Folder Metadata').output.itemName",
+														"type": "Expression"
+													},
+													"FileName": {
+														"value": "@activity('Get File Metadata').output.itemName",
+														"type": "Expression"
+													}
+												}
+											}
+										]
+									},
+									{
+										"name": "Delete Raw Success",
+										"type": "Delete",
+										"dependsOn": [
+											{
+												"activity": "Copy Cleansed",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"dataset": {
+												"referenceName": "DS_DataFile",
+												"type": "DatasetReference",
+												"parameters": {
+													"Container": "raw",
+													"FolderName": {
+														"value": "@activity('Get Folder Metadata').output.itemName",
+														"type": "Expression"
+													},
+													"FileName": {
+														"value": "@activity('Get File Metadata').output.itemName",
+														"type": "Expression"
+													}
+												}
+											},
+											"enableLogging": false,
+											"storeSettings": {
+												"type": "AzureBlobStorageReadSettings",
+												"recursive": true,
+												"enablePartitionDiscovery": false
+											}
+										}
+									},
+									{
+										"name": "Update Audit Validated",
+										"type": "SqlServerStoredProcedure",
+										"dependsOn": [
+											{
+												"activity": "Delete Raw Success",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"storedProcedureName": "[audit].[UpdateADFAuditRecord]",
+											"storedProcedureParameters": {
+												"ErrorFlag": {
+													"value": "0",
+													"type": "Int32"
+												},
+												"FileName": {
+													"value": {
+														"value": "@activity('Get File Metadata').output.itemName",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"Source": {
+													"value": {
+														"value": "@pipeline().parameters.Source",
+														"type": "Expression"
+													},
+													"type": "String"
+												}
+											}
+										},
+										"linkedServiceName": {
+											"referenceName": "icaswf_datafactory_development_database",
+											"type": "LinkedServiceReference"
+										}
+									}
+								]
+							}
+						},
+						{
+							"name": "Create Audit Record",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Get File Metadata",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[audit].[CreateADFAuditRecord]",
+								"storedProcedureParameters": {
+									"ColumnCount": {
+										"value": {
+											"value": "@activity('Get File Metadata').output.columnCount",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"ExpectedColumnCount": {
+										"value": {
+											"value": "@activity('Get Template Metadata').output.columnCount",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"ExpectedStructure": {
+										"value": {
+											"value": "@join(activity('Get Template Metadata').output.structure,',')",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"FileName": {
+										"value": {
+											"value": "@activity('Get File Metadata').output.itemName",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"FileType": {
+										"value": {
+											"value": "@activity('Get File Metadata').output.itemType",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Size": {
+										"value": {
+											"value": "@activity('Get File Metadata').output.size",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Source": {
+										"value": {
+											"value": "@pipeline().parameters.Source",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Structure": {
+										"value": {
+											"value": "@join(activity('Get File Metadata').output.structure,',')",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"DataFactory_Name": {
+										"value": {
+											"value": "@pipeline().DataFactory",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Pipeline_Name": {
+										"value": {
+											"value": "@pipeline().Pipeline",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"RunID": {
+										"value": {
+											"value": "@pipeline().RunId",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "icaswf_datafactory_development_database",
+								"type": "LinkedServiceReference"
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Get Template Metadata",
+				"type": "GetMetadata",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "DS_TemplateFile",
+						"type": "DatasetReference",
+						"parameters": {
+							"Container": "templates",
+							"FolderName": {
+								"value": "@pipeline().parameters.Source",
+								"type": "Expression"
+							},
+							"FileName": "InputTemplate.txt"
+						}
+					},
+					"fieldList": [
+						"structure",
+						"columnCount"
+					],
+					"storeSettings": {
+						"type": "AzureBlobStorageReadSettings",
+						"recursive": true,
+						"enablePartitionDiscovery": false
+					},
+					"formatSettings": {
+						"type": "DelimitedTextReadSettings"
+					}
+				}
+			},
+			{
+				"name": "For Each File in Folder",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Get Template Metadata",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Get Folder Metadata",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Get Folder Metadata').output.childitems",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "If StaticFile Encountered",
+							"type": "IfCondition",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@if(contains(item().name, 'StaticFile'), true, false)",
+									"type": "Expression"
+								},
+								"ifFalseActivities": [
+									{
+										"name": "Append to FileList",
+										"type": "AppendVariable",
+										"dependsOn": [],
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "FileList",
+											"value": {
+												"value": "@item().name",
+												"type": "Expression"
+											}
+										}
+									}
+								]
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"Source": {
+				"type": "string",
+				"defaultValue": "Adult_Social_Care_Activity"
+			}
+		},
+		"variables": {
+			"FileList": {
+				"type": "Array"
+			}
+		},
+		"folder": {
+			"name": "Discontinued"
+		},
+		"annotations": []
+	}
+}

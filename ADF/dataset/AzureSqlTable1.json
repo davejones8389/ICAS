@@ -1,0 +1,72 @@
+{
+	"name": "AzureSqlTable1",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "icaswf_datafactory_development_database",
+			"type": "LinkedServiceReference"
+		},
+		"folder": {
+			"name": "DS Check Financial Years"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "Adult_Social_Care_Activity",
+				"type": "nvarchar"
+			},
+			{
+				"name": "Community_Activity_Bury",
+				"type": "nvarchar"
+			},
+			{
+				"name": "Community_Activity_Oldham",
+				"type": "nvarchar"
+			},
+			{
+				"name": "Community_Activity_Rochdale_1",
+				"type": "nvarchar"
+			},
+			{
+				"name": "Community_Activity_Rochdale_2",
+				"type": "nvarchar"
+			},
+			{
+				"name": "Community_Activity_Salford",
+				"type": "nvarchar"
+			},
+			{
+				"name": "Diagnostics_Salford",
+				"type": "nvarchar"
+			},
+			{
+				"name": "ESR",
+				"type": "nvarchar"
+			},
+			{
+				"name": "SingleSource",
+				"type": "nvarchar"
+			},
+			{
+				"name": "SLR",
+				"type": "nvarchar"
+			},
+			{
+				"name": "SUS_Acute_AE",
+				"type": "nvarchar"
+			},
+			{
+				"name": "SUS_Acute_OP",
+				"type": "nvarchar"
+			},
+			{
+				"name": "SUS_Acute_IP",
+				"type": "nvarchar"
+			}
+		],
+		"typeProperties": {
+			"schema": "audit",
+			"table": "Check_Financial_Years"
+		}
+	}
+}

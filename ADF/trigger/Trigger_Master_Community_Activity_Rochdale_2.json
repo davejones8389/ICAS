@@ -1,0 +1,29 @@
+{
+	"name": "Trigger_Master_Community_Activity_Rochdale_2",
+	"properties": {
+		"annotations": [],
+		"runtimeState": "Started",
+		"pipelines": [
+			{
+				"pipelineReference": {
+					"referenceName": "PL_FileValidation",
+					"type": "PipelineReference"
+				},
+				"parameters": {
+					"Source": "@triggerBody().folderPath",
+					"TriggeringFile": "@triggerBody().fileName"
+				}
+			}
+		],
+		"type": "BlobEventsTrigger",
+		"typeProperties": {
+			"blobPathBeginsWith": "/raw/blobs/Community_Activity_Rochdale_2/",
+			"blobPathEndsWith": ".txt",
+			"ignoreEmptyBlobs": true,
+			"scope": "/subscriptions/f124cf91-5b67-454a-9cee-eb0d90b03461/resourceGroups/icaswf-landing-storage-resource-group/providers/Microsoft.Storage/storageAccounts/icaswflanding",
+			"events": [
+				"Microsoft.Storage.BlobCreated"
+			]
+		}
+	}
+}

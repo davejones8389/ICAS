@@ -1,0 +1,100 @@
+{
+	"name": "PL_CheckFolder",
+	"properties": {
+		"activities": [
+			{
+				"name": "Get Folder Exists",
+				"type": "GetMetadata",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "DS_DataFolder",
+						"type": "DatasetReference",
+						"parameters": {
+							"Container": "cleansed",
+							"FolderName": {
+								"value": "@pipeline().parameters.Source",
+								"type": "Expression"
+							}
+						}
+					},
+					"fieldList": [
+						"exists"
+					],
+					"storeSettings": {
+						"type": "AzureBlobStorageReadSettings",
+						"recursive": true,
+						"enablePartitionDiscovery": false
+					},
+					"formatSettings": {
+						"type": "DelimitedTextReadSettings"
+					}
+				}
+			},
+			{
+				"name": "Check Exists",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "Get Folder Exists",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@activity('Get Folder Exists').output.exists",
+						"type": "Expression"
+					},
+					"ifTrueActivities": [
+						{
+							"name": "Copy To DB",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "PL_CopyToDB",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"Source": {
+										"value": "@pipeline().parameters.Source",
+										"type": "Expression"
+									},
+									"TriggeringFile": {
+										"value": "@pipeline().parameters.TriggeringFile",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"Source": {
+				"type": "string"
+			},
+			"TriggeringFile": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "Pipeline Set 1: PL Client Data File"
+		},
+		"annotations": []
+	}
+}

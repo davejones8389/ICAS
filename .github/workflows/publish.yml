@@ -1,0 +1,130 @@
+name: Publish
+
+on:
+  push:
+    branches:
+   #   - 'main'
+   #   - '!test'
+   #   - '!development'
+     - '*'
+   
+env:
+  SQL_RESOURCE_GROUP_NAME: mssql-demo
+  SQL_SERVER_NAME: mssql-demo-dev
+  #FQ_SQL_SERVER_NAME: mssql-demo-dev.database.windows.net
+  KEYVAULT_NAME: davejoneskv123
+  
+  SQL_DATABASE_NAME: ${GITHUB_REF#refs/*/}
+  SQL_USERNAME: ${{secrets.SQL_USERNAME}}
+  SQL_PASSWORD: ${{secrets.SQL_PASSWORD}}
+  
+jobs:
+ 
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: 'true'
+     
+    - name: Setup dotnet 6.0
+      uses: actions/setup-dotnet@v2
+      with:
+        dotnet-version: '6.0.x'
+
+    - name: dotnet build
+      run: dotnet build
+
+    - name: Install Packages
+      run: |
+        curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+        sudo apt-get update
+        sudo apt-get install -y wget apt-transport-https software-properties-common
+        wget -q https://packages.microsoft.com/config/ubuntu/18.04/packages-microsoft-prod.deb
+        sudo dpkg -i packages-microsoft-prod.deb
+        
+        curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
+        curl https://packages.microsoft.com/config/ubuntu/20.04/prod.list | sudo tee /etc/apt/sources.list.d/msprod.list
+        sudo apt-get update
+        sudo add-apt-repository universe
+        sudo apt-get install -y powershell
+        sudo apt-get install azure-cli
+        sudo apt-get install mssql-tools unixodbc-dev
+        sudo apt-get install mssql-tools
+    
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Add SQL IP Access
+      uses: azure/CLI@v1
+      with:
+        inlineScript: |
+          IP=$(curl ipinfo.io/ip)
+          az sql server firewall-rule create -n ${GITHUB_REF#refs/*/} --resource-group $SQL_RESOURCE_GROUP_NAME --server $SQL_SERVER_NAME --start-ip-address $IP --end-ip-address $IP
+    
+    - name: Create Database
+      uses: azure/CLI@v1
+      with:
+        azcliversion: 2.36.0
+        inlineScript: |
+          if [ $(az sql db list --resource-group $SQL_RESOURCE_GROUP_NAME --server $SQL_SERVER_NAME --query "[?name=='${{ github.ref }}'] | length(@)") > 0 ]; then
+            az sql db create \
+              --name ${GITHUB_REF#refs/*/} \
+              --resource-group $SQL_RESOURCE_GROUP_NAME \
+              --server $SQL_SERVER_NAME \
+              --backup-storage-redundancy Local \
+              --capacity 5 \
+              --collation SQL_Latin1_General_CP1_CI_AS \
+              --compute-model Provisioned \
+              --edition Basic \
+              --ledger-on Disabled \
+              --license-type LicenseIncluded \
+              --max-size 2147483648 \
+              --yes \
+              --zone-redundant false
+          fi
+
+    - name: Set the Connection String Value 
+      id: step_one
+      run: |
+        echo "connection_string=Server=tcp:$SQL_SERVER_NAME.database.windows.net,1433;Initial Catalog=${GITHUB_REF#refs/*/};Persist Security Info=False;User ID=${{ secrets.SQL_USERNAME }};Password=${{ secrets.SQL_PASSWORD }};MultipleActiveResultSets=False;Encrypt=True;Connection Timeout=30;" >> $GITHUB_ENV
+
+    - name: Deploy to DB
+      uses: azure/sql-action@v1.2
+      with:        
+        connection-string: ${{ env.connection_string }}
+        dacpac-package: '/home/runner/work/mssql-demo/mssql-demo/bin/Debug/netstandard2.0/mssql-demo.dacpac'
+
+    - name: Generate random password
+      run: |
+         $password = -join ((65..90) + (97..122) | Get-Random -Count 32 | % {[char]$_});
+         $password = $password -replace '^(.)','%';
+         echo "PASSWORD=$password" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
+      shell: pwsh
+
+    - name: Create keyvault secret
+      uses: azure/CLI@v1
+      with:
+        inlineScript: |
+         az keyvault secret set --name ${GITHUB_REF#refs/*/} --vault-name $KEYVAULT_NAME --value $PASSWORD
+    
+    - name: Install SQLCMD, Create SQL User
+      run: |
+         sqlcmd -S $SQL_SERVER_NAME.database.windows.net -d ${GITHUB_REF#refs/*/} -U $SQL_USERNAME -P $SQL_PASSWORD -Q "
+           IF NOT EXISTS (SELECT  [name]     
+            FROM   sys.database_principals      
+            WHERE   [name] = '${GITHUB_REF#refs/*/}'   )  
+          BEGIN  
+          CREATE USER [${GITHUB_REF#refs/*/}] with password = '$PASSWORD'
+          END
+           ALTER ROLE db_datareader ADD MEMBER [${GITHUB_REF#refs/*/}]; 
+           ALTER ROLE db_datawriter ADD MEMBER [${GITHUB_REF#refs/*/}];
+           ALTER ROLE db_ddladmin ADD MEMBER [${GITHUB_REF#refs/*/}];"
+
+    - name: Remove SQL IP Access
+      uses: azure/CLI@v1
+      with:
+        inlineScript: |
+          az sql server firewall-rule delete -n ${GITHUB_REF#refs/*/} --resource-group $SQL_RESOURCE_GROUP_NAME --server $SQL_SERVER_NAME 

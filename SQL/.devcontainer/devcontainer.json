@@ -1,0 +1,16 @@
+{
+    "name": "SQLPackage",
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+    "settings": {},
+    "extensions": [
+        "aaron-bond.better-comments",
+        "mtxr.sqltools",
+        "microsoft.sql-database-projects"
+    ],
+    "remoteUser": "root",
+    "runArgs": [
+        "--env-file", ".devcontainer/.env"
+    ]
+}

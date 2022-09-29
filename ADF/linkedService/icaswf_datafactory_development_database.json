@@ -1,0 +1,27 @@
+{
+	"name": "icaswf_datafactory_development_database",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
+	"properties": {
+		"connectVia": {
+			"referenceName": "IntegrationRuntime",
+			"type": "IntegrationRuntimeReference"
+		},
+		"type": "AzureSqlDatabase",
+		"typeProperties": {
+			"connectionString": {
+				"type": "SecureString",
+				"value": "**********"
+			},
+			"password": {
+				"secretName": "sql-adf-password",
+				"store": {
+					"referenceName": "icaswf-datafactory-keyvault",
+					"type": "LinkedServiceReference"
+				},
+				"type": "AzureKeyVaultSecret"
+			},
+			"tenant": ""
+		},
+		"annotations": []
+	}
+}

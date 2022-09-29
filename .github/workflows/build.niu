@@ -1,0 +1,59 @@
+name: Build
+
+on:
+  push:
+    branches:
+  #     - 'main'
+  #    - '!test'
+  #    - '!development'
+  #    - '*'
+     
+  pull_request:
+    branches:
+      - main
+      - test
+      - development
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: 'true'
+     
+    - name: Setup dotnet 6.0
+      uses: actions/setup-dotnet@v2
+      with:
+        dotnet-version: '6.0.x'
+
+    - name: dotnet build
+      run: dotnet build
+
+    - name: Install Packages
+      run: |
+        curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+        sudo apt-get update
+        sudo apt-get install -y wget apt-transport-https software-properties-common
+        wget -q https://packages.microsoft.com/config/ubuntu/18.04/packages-microsoft-prod.deb
+        sudo dpkg -i packages-microsoft-prod.deb
+        
+        curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
+        curl https://packages.microsoft.com/config/ubuntu/20.04/prod.list | sudo tee /etc/apt/sources.list.d/msprod.list
+        sudo apt-get update
+        sudo add-apt-repository universe
+        sudo apt-get install -y powershell
+        sudo apt-get install azure-cli
+        sudo apt-get install mssql-tools unixodbc-dev
+        sudo apt-get install mssql-tools
+        
+  call-publish:
+    runs-on: ubuntu-latest
+    steps: 
+   # - name: Checkout
+   #   uses: actions/checkout@v3
+   #   with:
+   #     submodules: 'true'
+
+    - name: Call Publish
+      uses: ./.github/workflows/publish.yml@davej7

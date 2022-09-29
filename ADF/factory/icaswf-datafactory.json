@@ -1,0 +1,9 @@
+{
+	"name": "icaswf-datafactory",
+	"location": "uksouth",
+	"identity": {
+		"type": "SystemAssigned",
+		"principalId": "f21701bb-cb5e-4653-a3ec-78469082a527",
+		"tenantId": "3d3b2636-2a6b-43d0-81a8-5cce72ea6f44"
+	}
+}

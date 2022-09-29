@@ -1,0 +1,821 @@
+{
+	"name": "PL_CopyToDB",
+	"properties": {
+		"activities": [
+			{
+				"name": "Copy to DB",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Truncate Target",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "DelimitedTextSource",
+						"storeSettings": {
+							"type": "AzureBlobStorageReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "DelimitedTextReadSettings"
+						}
+					},
+					"sink": {
+						"type": "AzureSqlSink"
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_DataFile",
+						"type": "DatasetReference",
+						"parameters": {
+							"Container": "cleansed",
+							"FolderName": {
+								"value": "@pipeline().parameters.Source",
+								"type": "Expression"
+							},
+							"FileName": {
+								"value": "@pipeline().parameters.TriggeringFile",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_SQLDB",
+						"type": "DatasetReference",
+						"parameters": {
+							"TargetSchema": "clientdata",
+							"TargetTable": {
+								"value": "@pipeline().parameters.Source",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			},
+			{
+				"name": "Move File to Processed",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Copy to DB",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "DelimitedTextSource",
+						"storeSettings": {
+							"type": "AzureBlobStorageReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "DelimitedTextReadSettings"
+						}
+					},
+					"sink": {
+						"type": "DelimitedTextSink",
+						"storeSettings": {
+							"type": "AzureBlobStorageWriteSettings"
+						},
+						"formatSettings": {
+							"type": "DelimitedTextWriteSettings",
+							"quoteAllText": true,
+							"fileExtension": ".txt"
+						}
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_DataFile",
+						"type": "DatasetReference",
+						"parameters": {
+							"Container": "cleansed",
+							"FolderName": {
+								"value": "@pipeline().parameters.Source",
+								"type": "Expression"
+							},
+							"FileName": {
+								"value": "@pipeline().parameters.TriggeringFile",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_DataFile",
+						"type": "DatasetReference",
+						"parameters": {
+							"Container": "processed",
+							"FolderName": {
+								"value": "@pipeline().parameters.Source",
+								"type": "Expression"
+							},
+							"FileName": {
+								"value": "@pipeline().parameters.TriggeringFile",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			},
+			{
+				"name": "Delete from Cleansed",
+				"type": "Delete",
+				"dependsOn": [
+					{
+						"activity": "Move File to Processed",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "DS_DataFile",
+						"type": "DatasetReference",
+						"parameters": {
+							"Container": "cleansed",
+							"FolderName": {
+								"value": "@pipeline().parameters.Source",
+								"type": "Expression"
+							},
+							"FileName": {
+								"value": "@pipeline().parameters.TriggeringFile",
+								"type": "Expression"
+							}
+						}
+					},
+					"enableLogging": false,
+					"storeSettings": {
+						"type": "AzureBlobStorageReadSettings",
+						"recursive": true,
+						"enablePartitionDiscovery": false
+					}
+				}
+			},
+			{
+				"name": "Pipeline Log",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Delete from Cleansed",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[audit].[sp_UpdateLogTable]",
+					"storedProcedureParameters": {
+						"CopyActivity_End_Time": {
+							"value": {
+								"value": "@{utcnow()}",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"CopyActivity_queuingDuration_in_secs": {
+							"value": {
+								"value": "@{activity('Copy To DB').output.executionDetails[0]. detailedDurations.queuingDuration}",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"CopyActivity_Start_Time": {
+							"value": {
+								"value": "@{activity('Copy To DB').output.executionDetails[0].start}",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"CopyActivity_transferDuration_in_secs": {
+							"value": {
+								"value": "@{activity('Copy To DB').output.executionDetails[0]. detailedDurations.transferDuration}",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"copyDuration_in_secs": {
+							"value": {
+								"value": "@{activity('Copy To DB').output.copyDuration}",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"DataFactory_Name": {
+							"value": {
+								"value": "@{pipeline().DataFactory}",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"DataRead": {
+							"value": {
+								"value": "@{activity('Copy To DB').output.rowsRead}",
+								"type": "Expression"
+							},
+							"type": "Int32"
+						},
+						"Destination": {
+							"value": {
+								"value": "@concat('clientdata.', pipeline().parameters.Source)",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"effectiveIntegrationRuntime": {
+							"value": {
+								"value": "@{activity('Copy To DB').output.effectiveIntegrationRuntime}",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"Execution_Status": {
+							"value": {
+								"value": "@{activity('Copy To DB').output.executionDetails[0].status}",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"No_ParallelCopies": {
+							"value": {
+								"value": "@{activity('Copy To DB').output.usedParallelCopies}",
+								"type": "Expression"
+							},
+							"type": "Int32"
+						},
+						"Pipeline_Name": {
+							"value": {
+								"value": "@{pipeline().Pipeline}",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"rowsCopied": {
+							"value": {
+								"value": "@{activity('Copy To DB').output.rowsCopied}",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"RunID": {
+							"value": {
+								"value": "@{pipeline().RunId}",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"Sink_Type": {
+							"value": {
+								"value": "@{activity('Copy To DB').output.executionDetails[0].sink.type}",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"Source": {
+							"value": {
+								"value": "@concat('cleansed/',pipeline().parameters.Source,'/',pipeline().parameters.TriggeringFile)",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"Source_Type": {
+							"value": {
+								"value": "@{activity('Copy To DB').output.executionDetails[0].source.type}",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"TriggerId": {
+							"value": {
+								"value": "@{pipeline().TriggerId}",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"TriggerName": {
+							"value": {
+								"value": "@{pipeline().TriggerName}",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"TriggerTime": {
+							"value": {
+								"value": "@{pipeline().TriggerTime}",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"TriggerType": {
+							"value": {
+								"value": "@{pipeline().TriggerType}",
+								"type": "Expression"
+							},
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "icaswf_datafactory_development_database",
+					"type": "LinkedServiceReference"
+				}
+			},
+			{
+				"name": "Move File to Error",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Copy to DB",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "DelimitedTextSource",
+						"storeSettings": {
+							"type": "AzureBlobStorageReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "DelimitedTextReadSettings"
+						}
+					},
+					"sink": {
+						"type": "DelimitedTextSink",
+						"storeSettings": {
+							"type": "AzureBlobStorageWriteSettings"
+						},
+						"formatSettings": {
+							"type": "DelimitedTextWriteSettings",
+							"quoteAllText": true,
+							"fileExtension": ".txt"
+						}
+					},
+					"enableStaging": false
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_DataFile",
+						"type": "DatasetReference",
+						"parameters": {
+							"Container": "cleansed",
+							"FolderName": {
+								"value": "@pipeline().parameters.Source",
+								"type": "Expression"
+							},
+							"FileName": {
+								"value": "@pipeline().parameters.TriggeringFile",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_DataFile",
+						"type": "DatasetReference",
+						"parameters": {
+							"Container": "error",
+							"FolderName": {
+								"value": "@pipeline().parameters.Source",
+								"type": "Expression"
+							},
+							"FileName": {
+								"value": "@pipeline().parameters.TriggeringFile",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			},
+			{
+				"name": "Delete from Cleansed2",
+				"type": "Delete",
+				"dependsOn": [
+					{
+						"activity": "Move File to Error",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "DS_DataFile",
+						"type": "DatasetReference",
+						"parameters": {
+							"Container": "cleansed",
+							"FolderName": {
+								"value": "@pipeline().parameters.Source",
+								"type": "Expression"
+							},
+							"FileName": {
+								"value": "@pipeline().parameters.TriggeringFile",
+								"type": "Expression"
+							}
+						}
+					},
+					"enableLogging": false,
+					"storeSettings": {
+						"type": "AzureBlobStorageReadSettings",
+						"recursive": true,
+						"enablePartitionDiscovery": false
+					}
+				}
+			},
+			{
+				"name": "Pipeline Error",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Delete from Cleansed2",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[audit].[sp_UpdateErrorTable]",
+					"storedProcedureParameters": {
+						"copyDuration_in_secs": {
+							"value": {
+								"value": "@{activity('Copy To DB').output.copyDuration}",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"DataFactory_Name": {
+							"value": {
+								"value": "@{pipeline().DataFactory}",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"Destination": {
+							"value": {
+								"value": "@concat('clientdata.', pipeline().parameters.Source)",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"effectiveIntegrationRuntime": {
+							"value": {
+								"value": "@{activity('Copy To DB').output.effectiveIntegrationRuntime}",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"ErrorCode": {
+							"value": {
+								"value": "@{activity('Copy To DB').error.errorCode}",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"ErrorDescription": {
+							"value": {
+								"value": "@{activity('Copy To DB').error.message}",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"ErrorLoggedTime": {
+							"value": {
+								"value": "@utcnow()",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"Execution_Status": {
+							"value": {
+								"value": "@{activity('Copy To DB').output.executionDetails[0].status}",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"FailureType": {
+							"value": {
+								"value": "@concat(activity('Copy To DB').error.message,'failureType:',activity('Copy To DB').error.failureType)",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"No_ParallelCopies": {
+							"value": {
+								"value": "@{activity('Copy To DB').output.usedParallelCopies}",
+								"type": "Expression"
+							},
+							"type": "Int32"
+						},
+						"Pipeline_Name": {
+							"value": {
+								"value": "@{pipeline().Pipeline}",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"RunId": {
+							"value": {
+								"value": "@{pipeline().RunId}",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"Sink_Type": {
+							"value": {
+								"value": "@{activity('Copy To DB').output.executionDetails[0].sink.type}",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"Source": {
+							"value": {
+								"value": "@concat('cleansed/',pipeline().parameters.Source,'/',pipeline().parameters.TriggeringFile)",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"Source_Type": {
+							"value": {
+								"value": "@{activity('Copy To DB').output.executionDetails[0].source.type}",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"TriggerId": {
+							"value": {
+								"value": "@{pipeline().TriggerId}",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"TriggerName": {
+							"value": {
+								"value": "@{pipeline().TriggerName}",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"TriggerTime": {
+							"value": {
+								"value": "@{pipeline().TriggerTime}",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"TriggerType": {
+							"value": {
+								"value": "@{pipeline().TriggerType}",
+								"type": "Expression"
+							},
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "icaswf_datafactory_development_database",
+					"type": "LinkedServiceReference"
+				}
+			},
+			{
+				"name": "Truncate Target",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[adfconfig].[TruncateTable]",
+					"storedProcedureParameters": {
+						"schemaName": {
+							"value": "clientdata",
+							"type": "String"
+						},
+						"tableName": {
+							"value": {
+								"value": "@pipeline().parameters.Source",
+								"type": "Expression"
+							},
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "icaswf_datafactory_development_database",
+					"type": "LinkedServiceReference"
+				}
+			},
+			{
+				"name": "Send email for successful copy",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Pipeline Log",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "PL_SendEmailNotification_Generic",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"NotificationMailAddressList": {
+							"value": "@pipeline().parameters.NotificationMailAddressList",
+							"type": "Expression"
+						},
+						"ParentPipelineName": "PL_CopyToDB",
+						"ParentPipelineStatus": "Success",
+						"MessageContentSP": "EMailNotification_PLClientDataFileCopytoDB",
+						"MessageSubject": "Copy to Database Summary of Uploaded File",
+						"ParentPipelineRunId": {
+							"value": "@pipeline().RunId",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Send email for failed copy",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Pipeline Error",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "PL_SendEmailNotification_Generic",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"NotificationMailAddressList": {
+							"value": "@pipeline().parameters.NotificationMailAddressList",
+							"type": "Expression"
+						},
+						"ParentPipelineName": "PL_CopyToDB",
+						"ParentPipelineStatus": "Failed",
+						"MessageContentSP": "EMailNotification_PLClientDataFileCopytoDB",
+						"MessageSubject": "Copy to Database Summary of Uploaded File",
+						"ParentPipelineRunId": {
+							"value": "@pipeline().RunId",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Execute Controller Procedures",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Send email for successful copy",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "PL_FinancialYear_Check",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"ProcedureGroup": "Controller",
+						"ProcedureGroupStartRunID": "1",
+						"ProcedureGroupEndRunID": "5",
+						"ParentPipeline": {
+							"value": "@pipeline().Pipeline",
+							"type": "Expression"
+						},
+						"NotificationMailAddressList": "carsten.adams@kpmg.co.uk",
+						"SendNotificationMail": true,
+						"ContinueFromLastProcedureFailure": false
+					}
+				}
+			}
+		],
+		"parameters": {
+			"Source": {
+				"type": "string"
+			},
+			"TriggeringFile": {
+				"type": "string"
+			},
+			"NotificationMailAddressList": {
+				"type": "string",
+				"defaultValue": "carsten.adams@kpmg.co.uk"
+			}
+		},
+		"folder": {
+			"name": "Pipeline Set 1: PL Client Data File"
+		},
+		"annotations": []
+	}
+}

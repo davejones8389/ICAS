@@ -1,0 +1,23 @@
+DECLARE access cursor for
+
+select 'grant execute on ' +  SCHEMA_NAME(schema_id) + '.' +  quotename(name) + ' to ' + quotename(db_name()) + ' go '
+from sys.procedures
+
+DECLARE @Script nvarchar(1000);
+
+OPEN access
+
+FETCH NEXT FROM access INTO @Script
+
+WHILE @@FETCH_STATUS = 0
+
+BEGIN
+
+exec(@Script)
+
+FETCH NEXT FROM access INTO @Script
+
+END
+
+CLOSE access
+DEALLOCATE access 

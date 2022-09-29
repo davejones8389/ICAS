@@ -1,0 +1,104 @@
+{
+	"name": "PL_Master_File_Event_copy1",
+	"properties": {
+		"activities": [
+			{
+				"name": "Execute Validation",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "PL_FileValidation",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"Source": {
+							"value": "@pipeline().parameters.Source",
+							"type": "Expression"
+						},
+						"TriggeringFile": {
+							"value": "@pipeline().parameters.TriggeringFile",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Execute Copy to DB if exists",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Execute Validation",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "PL_CheckFolder",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"Source": {
+							"value": "@pipeline().parameters.Source",
+							"type": "Expression"
+						},
+						"TriggeringFile": {
+							"value": "@pipeline().parameters.TriggeringFile",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Execute Controller Procedures",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Execute Copy to DB if exists",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "PL_FinancialYear_Check",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"ProcedureGroup": "Controller",
+						"ProcedureGroupStartRunID": "1",
+						"ProcedureGroupEndRunID": "2",
+						"ParentPipeline": {
+							"value": "@pipeline().Pipeline",
+							"type": "Expression"
+						},
+						"NotificationMailAddressList": "carsten.adams@kpmg.co.uk",
+						"SendNotificationMail": true,
+						"ContinueFromLastProcedureFailure": true
+					}
+				}
+			}
+		],
+		"parameters": {
+			"Source": {
+				"type": "string"
+			},
+			"TriggeringFile": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "PL Backup"
+		},
+		"annotations": []
+	}
+}

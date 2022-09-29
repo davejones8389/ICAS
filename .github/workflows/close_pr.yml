@@ -1,0 +1,47 @@
+name: Clean-up
+
+on:
+  pull_request:
+    types: 
+      - closed
+    branches:    
+      - 'development'
+
+env:
+  SQL_RESOURCE_GROUP_NAME: mssql-demo
+  SQL_SERVER_NAME: mssql-demo-dev
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: 'true'
+    
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Add SQL IP Access
+      uses: azure/CLI@v1
+      with:
+        inlineScript: |
+          IP=$(curl ipinfo.io/ip)
+          az sql server firewall-rule create -n ${{ github.head_ref }} --resource-group $SQL_RESOURCE_GROUP_NAME --server $SQL_SERVER_NAME --start-ip-address $IP --end-ip-address $IP
+    
+    - name: Delete Database
+      uses: azure/CLI@v1
+      with:
+        azcliversion: 2.36.0
+        inlineScript: |
+          if [ $(az sql db list --resource-group $SQL_RESOURCE_GROUP_NAME --server $SQL_SERVER_NAME --query "[?name=='${{ github.ref }}'] | length(@)") > 0 ]; then
+            az sql db delete --name ${{ github.head_ref }} --resource-group $SQL_RESOURCE_GROUP_NAME --server $SQL_SERVER_NAME --yes
+          fi
+
+    - name: Remove SQL IP Access
+      uses: azure/CLI@v1
+      with:
+        inlineScript: |
+          az sql server firewall-rule delete -n ${{ github.head_ref }} --resource-group $SQL_RESOURCE_GROUP_NAME --server $SQL_SERVER_NAME 

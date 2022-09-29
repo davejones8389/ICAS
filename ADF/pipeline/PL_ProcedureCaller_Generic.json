@@ -1,0 +1,525 @@
+{
+	"name": "PL_ProcedureCaller_Generic",
+	"properties": {
+		"activities": [
+			{
+				"name": "Get Procedure List By Procedure Group",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Set EntryPoint",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "@concat('SELECT [Procedure_Group], [Procedure_Group_Run_Id], [Procedure_Name] FROM [adfconfig].[procedure_caller] WHERE [Procedure_IsEnabled] = 1 AND [Procedure_Group] = ''', pipeline().parameters.ProcedureGroup,''' AND [Procedure_Group_Run_ID] >= ',variables('EntryPoint'),' AND [Procedure_Group_Run_ID] <= ', pipeline().parameters.ProcedureGroupEndRunID, ' ORDER BY [Procedure_Group_Run_ID] ASC')",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_SQLDB",
+						"type": "DatasetReference",
+						"parameters": {
+							"TargetSchema": "adfconfig",
+							"TargetTable": "procedure_caller"
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Iterarate Procedures",
+				"description": "Iterate and execute the stored procedure fetched from the Get Procedure List By Procedure Group activity. Currently ADF doesn't support the feature that loop breaks if inner activity fails. Therefore this logic was implemented manually by using and setting accordingly the IsProcedureError variable.",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Get Procedure List By Procedure Group",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Get Procedure List By Procedure Group').output.Value",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "If Last Procedure is in Error",
+							"type": "IfCondition",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@equals(variables('IsProcedureError'), 'True')",
+									"type": "Expression"
+								},
+								"ifFalseActivities": [
+									{
+										"name": "Audit Procedure Start",
+										"type": "SqlServerStoredProcedure",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"storedProcedureName": "[audit].[sp_UpdateProcedureCallerLog]",
+											"storedProcedureParameters": {
+												"DataFactory_Name": {
+													"value": {
+														"value": "@pipeline().DataFactory",
+														"type": "Expression"
+													}
+												},
+												"Pipeline_Name": {
+													"value": {
+														"value": "@concat(pipeline().parameters.ParentPipeline, if(equals(string(length(string(pipeline().parameters.ParentPipeline))), '0'), '','.'), pipeline().Pipeline)",
+														"type": "Expression"
+													}
+												},
+												"RunId": {
+													"value": {
+														"value": "@pipeline().RunId",
+														"type": "Expression"
+													}
+												},
+												"Procedure_Group": {
+													"value": {
+														"value": "@item().Procedure_Group",
+														"type": "Expression"
+													}
+												},
+												"Procedure_Group_Run_Id": {
+													"value": {
+														"value": "@item().Procedure_Group_Run_ID",
+														"type": "Expression"
+													}
+												},
+												"Procedure_Name": {
+													"value": {
+														"value": "@item().Procedure_Name",
+														"type": "Expression"
+													}
+												},
+												"Procedure_Status": {
+													"value": "Started"
+												},
+												"Procedure_Error_Message": {
+													"value": null
+												}
+											}
+										},
+										"linkedServiceName": {
+											"referenceName": "icaswf_datafactory_development_database",
+											"type": "LinkedServiceReference"
+										}
+									},
+									{
+										"name": "Procedure Call",
+										"type": "SqlServerStoredProcedure",
+										"dependsOn": [
+											{
+												"activity": "Audit Procedure Start",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"storedProcedureName": {
+												"value": "@item().Procedure_Name",
+												"type": "Expression"
+											}
+										},
+										"linkedServiceName": {
+											"referenceName": "icaswf_datafactory_development_database",
+											"type": "LinkedServiceReference"
+										}
+									},
+									{
+										"name": "Audit Procedure End",
+										"type": "SqlServerStoredProcedure",
+										"dependsOn": [
+											{
+												"activity": "Procedure Call",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"storedProcedureName": "[audit].[sp_UpdateProcedureCallerLog]",
+											"storedProcedureParameters": {
+												"DataFactory_Name": {
+													"value": {
+														"value": "@pipeline().DataFactory",
+														"type": "Expression"
+													}
+												},
+												"Pipeline_Name": {
+													"value": {
+														"value": "@concat(pipeline().parameters.ParentPipeline, if(equals(string(length(string(pipeline().parameters.ParentPipeline))), '0'), '','.'), pipeline().Pipeline)",
+														"type": "Expression"
+													}
+												},
+												"RunId": {
+													"value": {
+														"value": "@pipeline().RunId",
+														"type": "Expression"
+													}
+												},
+												"Procedure_Group": {
+													"value": {
+														"value": "@item().Procedure_Group",
+														"type": "Expression"
+													}
+												},
+												"Procedure_Group_Run_Id": {
+													"value": {
+														"value": "@item().Procedure_Group_Run_ID",
+														"type": "Expression"
+													}
+												},
+												"Procedure_Name": {
+													"value": {
+														"value": "@item().Procedure_Name",
+														"type": "Expression"
+													}
+												},
+												"Procedure_Status": {
+													"value": "Success"
+												},
+												"Procedure_Error_Message": {
+													"value": null
+												}
+											}
+										},
+										"linkedServiceName": {
+											"referenceName": "icaswf_datafactory_development_database",
+											"type": "LinkedServiceReference"
+										}
+									},
+									{
+										"name": "Audit Procedure Error",
+										"type": "SqlServerStoredProcedure",
+										"dependsOn": [
+											{
+												"activity": "Set IsProcedureError To True",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"storedProcedureName": "[audit].[sp_UpdateProcedureCallerLog]",
+											"storedProcedureParameters": {
+												"DataFactory_Name": {
+													"value": {
+														"value": "@pipeline().DataFactory",
+														"type": "Expression"
+													}
+												},
+												"Pipeline_Name": {
+													"value": {
+														"value": "@concat(pipeline().parameters.ParentPipeline, if(equals(string(length(string(pipeline().parameters.ParentPipeline))), '0'), '','.'), pipeline().Pipeline)",
+														"type": "Expression"
+													}
+												},
+												"RunId": {
+													"value": {
+														"value": "@pipeline().RunId",
+														"type": "Expression"
+													}
+												},
+												"Procedure_Group": {
+													"value": {
+														"value": "@item().Procedure_Group",
+														"type": "Expression"
+													}
+												},
+												"Procedure_Group_Run_Id": {
+													"value": {
+														"value": "@item().Procedure_Group_Run_ID",
+														"type": "Expression"
+													}
+												},
+												"Procedure_Name": {
+													"value": {
+														"value": "@item().Procedure_Name",
+														"type": "Expression"
+													}
+												},
+												"Procedure_Status": {
+													"value": "Failed"
+												},
+												"Procedure_Error_Message": {
+													"value": {
+														"value": "@{activity('Procedure Call').error.message}",
+														"type": "Expression"
+													}
+												}
+											}
+										},
+										"linkedServiceName": {
+											"referenceName": "icaswf_datafactory_development_database",
+											"type": "LinkedServiceReference"
+										}
+									},
+									{
+										"name": "Set IsProcedureError To True",
+										"description": "Set IsProcedureError to True. This will determine whether the subsequent stored procedures will be run.",
+										"type": "SetVariable",
+										"dependsOn": [
+											{
+												"activity": "Procedure Call",
+												"dependencyConditions": [
+													"Failed"
+												]
+											}
+										],
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "IsProcedureError",
+											"value": "True"
+										}
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Send Notification E-Mail",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "Iterarate Procedures",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@equals(pipeline().parameters.SendNotificationMail, true)",
+						"type": "Expression"
+					},
+					"ifTrueActivities": [
+						{
+							"name": "PL_SendEmailNotification_Generic",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "PL_SendEmailNotification_Generic",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"NotificationMailAddressList": {
+										"value": "@pipeline().parameters.NotificationMailAddressList",
+										"type": "Expression"
+									},
+									"ParentPipelineName": {
+										"value": "@concat(pipeline().parameters.ParentPipeline, if(equals(string(length(string(pipeline().parameters.ParentPipeline))), '0'), '','.'), pipeline().Pipeline)",
+										"type": "Expression"
+									},
+									"ParentPipelineStatus": {
+										"value": "@if(equals(variables('IsProcedureError'),'False'),'Success','Failed')",
+										"type": "Expression"
+									},
+									"MessageContentSP": "EMailNotification_PLProcedureCallerGeneric",
+									"MessageSubject": "Procedure Caller Summary",
+									"ParentPipelineRunId": {
+										"value": "@pipeline().RunId",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Set EntryPoint",
+				"description": "Check whether the ContinueFromLastProcedureFailure flag is enabled. If yes set the entry point to the last point of failure for the Procedure Group (if there was a failure in last run). Else set the entry point to the ProcedureGroupStartRunID parameter.",
+				"type": "IfCondition",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@equals(pipeline().parameters.ContinueFromLastProcedureFailure, true)",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "Set EntryPoint To ProcedureGroupStartRunID",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "EntryPoint",
+								"value": {
+									"value": "@pipeline().parameters.ProcedureGroupStartRunID",
+									"type": "Expression"
+								}
+							}
+						}
+					],
+					"ifTrueActivities": [
+						{
+							"name": "Set EntryPoint To Last Point of Failure",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "Get Last Procedure Group Run Status",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "EntryPoint",
+								"value": {
+									"value": "@if(contains(activity('Get Last Procedure Group Run Status').output, 'firstRow'),string(if(equals(activity('Get Last Procedure Group Run Status').output.firstRow.Procedure_Status, 'Failed'), activity('Get Last Procedure Group Run Status').output.firstRow.Procedure_Group_Run_Id, pipeline().parameters.ProcedureGroupStartRunID)),pipeline().parameters.ProcedureGroupStartRunID)",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Get Last Procedure Group Run Status",
+							"description": "Get the latest procedure group run status using the procedure_caller audit table.",
+							"type": "Lookup",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderQuery": {
+										"value": "@concat('SELECT TOP 1 ISNULL([pcl].[Procedure_Status], ''Procedure First Run'') AS [Procedure_Status], ISNULL([pcl].[Procedure_Group_Run_ID], ''',pipeline().parameters.ProcedureGroupStartRunID,''') AS [Procedure_Group_Run_ID] FROM [audit].[procedure_caller_log] AS [pcl] WHERE [Procedure_Group] = ''',pipeline().parameters.ProcedureGroup,''' ORDER BY [pcl].[TimeStamp_Procedure_Start] DESC')",
+										"type": "Expression"
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"dataset": {
+									"referenceName": "DS_SQLDB",
+									"type": "DatasetReference",
+									"parameters": {
+										"TargetSchema": "adfconfig",
+										"TargetTable": "procedure_caller"
+									}
+								},
+								"firstRowOnly": true
+							}
+						}
+					]
+				}
+			}
+		],
+		"concurrency": 1,
+		"parameters": {
+			"ProcedureGroup": {
+				"type": "string",
+				"defaultValue": "controller"
+			},
+			"ProcedureGroupStartRunID": {
+				"type": "string",
+				"defaultValue": "1"
+			},
+			"ProcedureGroupEndRunID": {
+				"type": "string",
+				"defaultValue": "5"
+			},
+			"ParentPipeline": {
+				"type": "string"
+			},
+			"NotificationMailAddressList": {
+				"type": "string",
+				"defaultValue": "carsten.adams@kpmg.co.uk"
+			},
+			"SendNotificationMail": {
+				"type": "bool",
+				"defaultValue": true
+			},
+			"ContinueFromLastProcedureFailure": {
+				"type": "bool",
+				"defaultValue": false
+			}
+		},
+		"variables": {
+			"IsProcedureError": {
+				"type": "String",
+				"defaultValue": "False"
+			},
+			"EntryPoint": {
+				"type": "String"
+			},
+			"ParentPipelineLength": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "Pipeline Set 4: PL SP Orchestration"
+		},
+		"annotations": []
+	}
+}

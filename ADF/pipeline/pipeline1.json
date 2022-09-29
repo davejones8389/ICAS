@@ -1,0 +1,107 @@
+{
+	"name": "pipeline1",
+	"properties": {
+		"activities": [
+			{
+				"name": "If Condition1",
+				"type": "IfCondition",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@bool(TRUE)",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "var-false",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "test",
+								"value": "false"
+							}
+						}
+					],
+					"ifTrueActivities": [
+						{
+							"name": "Copy data1",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "ExcelSource",
+									"storeSettings": {
+										"type": "AzureBlobStorageReadSettings",
+										"recursive": true,
+										"enablePartitionDiscovery": false
+									}
+								},
+								"sink": {
+									"type": "AzureSqlSink",
+									"preCopyScript": {
+										"value": "TRUNCATE TABLE [modeloutputs].[SQL Assumption Calcs-Workforce]",
+										"type": "Expression"
+									},
+									"disableMetricsCollection": false
+								},
+								"enableStaging": false
+							},
+							"inputs": [
+								{
+									"referenceName": "Source_SQL_Scenario_Calcs",
+									"type": "DatasetReference",
+									"parameters": {
+										"SheetName": "SQL Assumption Calcs-Workforce",
+										"Range": "S17",
+										"WorkbookName": "SRFT Workforce Model v2_2 dec_80mb_unlocked sheet.xlsx"
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "Sink_SQL_Scenario_Cals",
+									"type": "DatasetReference",
+									"parameters": {
+										"TableName": "SQL Assumption Calcs-Workforce"
+									}
+								}
+							]
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"Source": {
+				"type": "string"
+			},
+			"TriggeringFile": {
+				"type": "string",
+				"defaultValue": "ASC Workforce Model_Framework3.txt"
+			},
+			"NotificationMailAddressList": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"test": {
+				"type": "String",
+				"defaultValue": "test"
+			}
+		},
+		"folder": {
+			"name": "PL Backup"
+		},
+		"annotations": []
+	}
+}

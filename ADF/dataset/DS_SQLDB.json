@@ -1,0 +1,33 @@
+{
+	"name": "DS_SQLDB",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "icaswf_datafactory_development_database",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"TargetSchema": {
+				"type": "string"
+			},
+			"TargetTable": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "DS Sink"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [],
+		"typeProperties": {
+			"schema": {
+				"value": "@dataset().TargetSchema",
+				"type": "Expression"
+			},
+			"table": {
+				"value": "@dataset().TargetTable",
+				"type": "Expression"
+			}
+		}
+	}
+}
