@@ -6,15 +6,15 @@ resource "azurerm_data_factory" "data_factory" {
   identity {
     type = "SystemAssigned"
   }
-/*
+
   github_configuration {
-    account_name    = "KPMG-UK"
+    account_name    = "djones8389"
     branch_name     = "main"
     git_url         = "https://github.com"
-    repository_name = "icas-workforce-datafactory"
+    repository_name = "ICAS"
     root_folder     = "/"
   }
-  */
+  
   public_network_enabled = true
 
   #checkov:skip=CKV_AZURE_103:Not sure if github integration is required yet
