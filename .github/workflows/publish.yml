@@ -94,7 +94,7 @@ jobs:
       uses: azure/sql-action@v1.2
       with:        
         connection-string: ${{ env.connection_string }}
-        dacpac-package: '/home/runner/work/mssql-demo/mssql-demo/bin/Debug/netstandard2.0/mssql-demo.dacpac'
+        dacpac-package: '/home/runner/work/SQL/mssql-demo/bin/Debug/netstandard2.0/mssql-demo.dacpac'
 
     - name: Generate random password
       run: |
