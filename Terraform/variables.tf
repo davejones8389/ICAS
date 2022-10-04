@@ -34,6 +34,12 @@ variable "environment" {
   default     = ""
 }
 
+variable "adf_name" {
+  type        = list(string)
+  description = "A list of public ip addresses allowed access to keyvault."
+  default     = "dj-adf31842389t2jwg"
+}
+
 variable "allowed_key_vault_ips" {
   type        = list(string)
   description = "A list of public ip addresses allowed access to keyvault."
