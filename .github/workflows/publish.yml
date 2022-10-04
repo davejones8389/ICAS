@@ -97,7 +97,7 @@ jobs:
            ALTER ROLE db_datareader ADD MEMBER [${GITHUB_REF#refs/*/}]; 
            ALTER ROLE db_datawriter ADD MEMBER [${GITHUB_REF#refs/*/}];
            ALTER ROLE db_ddladmin ADD MEMBER [${GITHUB_REF#refs/*/}];"
-           
+
     - name: Set the Connection String Value 
       id: step_one
       run: |
@@ -107,7 +107,7 @@ jobs:
       uses: azure/sql-action@v1.2
       with:        
         connection-string: ${{ env.connection_string }}
-        dacpac-package: '/home/runner/work/ICAS/ICAS/bin/Debug/netstandard2.0/mssql-demo.dacpa'
+        dacpac-package: '/home/runner/work/ICAS/ICAS/bin/Debug/netstandard2.0/mssql-demo.dacpac'
 
     - name: Generate random password
       run: |
