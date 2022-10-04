@@ -85,6 +85,13 @@ jobs:
               --zone-redundant false
           fi
 
+    - name: Generate random password
+      run: |
+         $password = -join ((65..90) + (97..122) | Get-Random -Count 32 | % {[char]$_});
+         $password = $password -replace '^(.)','%';
+         echo "PASSWORD=$password" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
+      shell: pwsh
+
     - name: Install SQLCMD, Create SQL User
       run: |
          sqlcmd -S $SQL_SERVER_NAME.database.windows.net -d ${GITHUB_REF#refs/*/} -U $SQL_USERNAME -P $SQL_PASSWORD -Q "
@@ -98,6 +105,12 @@ jobs:
            ALTER ROLE db_datawriter ADD MEMBER [${GITHUB_REF#refs/*/}];
            ALTER ROLE db_ddladmin ADD MEMBER [${GITHUB_REF#refs/*/}];"
 
+    - name: Create keyvault secret
+      uses: azure/CLI@v1
+      with:
+        inlineScript: |
+         az keyvault secret set --name ${GITHUB_REF#refs/*/} --vault-name $KEYVAULT_NAME --value $PASSWORD
+
     - name: Set the Connection String Value 
       id: step_one
       run: |
@@ -108,21 +121,6 @@ jobs:
       with:        
         connection-string: ${{ env.connection_string }}
         dacpac-package: '/home/runner/work/ICAS/ICAS/bin/Debug/netstandard2.0/mssql-demo.dacpac'
-
-    - name: Generate random password
-      run: |
-         $password = -join ((65..90) + (97..122) | Get-Random -Count 32 | % {[char]$_});
-         $password = $password -replace '^(.)','%';
-         echo "PASSWORD=$password" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
-      shell: pwsh
-
-    - name: Create keyvault secret
-      uses: azure/CLI@v1
-      with:
-        inlineScript: |
-         az keyvault secret set --name ${GITHUB_REF#refs/*/} --vault-name $KEYVAULT_NAME --value $PASSWORD
-    
-
 
     - name: Remove SQL IP Access
       uses: azure/CLI@v1
