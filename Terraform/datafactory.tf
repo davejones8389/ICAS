@@ -1,6 +1,6 @@
 
 resource "azurerm_data_factory" "data_factory" {
-  name                = "dj-adf31842389t2jwg"
+  name                = var.adf_name
   resource_group_name = azurerm_resource_group.rg.name
   location            = azurerm_resource_group.rg.location
   identity {
@@ -8,11 +8,11 @@ resource "azurerm_data_factory" "data_factory" {
   }
 
   github_configuration {
-    account_name    = "djones8389"
+    account_name    = "davejones8389"
     branch_name     = "main"
     git_url         = "https://github.com"
     repository_name = "ICAS"
-    root_folder     = "/"
+    root_folder     = "/ADF"
   }
   
   public_network_enabled = true
