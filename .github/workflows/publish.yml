@@ -128,7 +128,7 @@ jobs:
         inlineScript: |
           az sql server firewall-rule delete -n ${GITHUB_REF#refs/*/} --resource-group $SQL_RESOURCE_GROUP_NAME --server $SQL_SERVER_NAME
 
-   - name: use_dynamic_install
+    - name: use_dynamic_install
       uses: azure/CLI@v1
       with:
         inlineScript: |
