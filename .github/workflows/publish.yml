@@ -138,5 +138,5 @@ jobs:
       uses: azure/CLI@v1
       with:
         inlineScript: |
-          az datafactory create --factory-name ${GITHUB_REF#refs/*/} --resource-group $SQL_RESOURCE_GROUP_NAME --factory-git-hub-configuration host-name=https://github.com account-name=davejones8389 repository-name=ICAS root-folder="/ADF"
+          az datafactory create --factory-name ${GITHUB_REF#refs/*/} --resource-group $SQL_RESOURCE_GROUP_NAME --factory-git-hub-configuration host-name=https://github.com account-name=davejones8389 repository-name=ICAS root-folder="/ADF" collaboration-branch="main"
 
