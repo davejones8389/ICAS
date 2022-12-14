@@ -127,11 +127,16 @@ jobs:
       with:
         inlineScript: |
           az sql server firewall-rule delete -n ${GITHUB_REF#refs/*/} --resource-group $SQL_RESOURCE_GROUP_NAME --server $SQL_SERVER_NAME
-          
-    - name: Create DataFactory
+
+   - name: use_dynamic_install
       uses: azure/CLI@v1
       with:
         inlineScript: |
           az config set extension.use_dynamic_install=yes_without_prompt
+
+    - name: Create DataFactory
+      uses: azure/CLI@v1
+      with:
+        inlineScript: |
           az datafactory create --factory-name ${GITHUB_REF#refs/*/} --resource-group $SQL_RESOURCE_GROUP_NAME --factory-git-hub-configuration host-name=https://github.com account-name=davejones8389 repository-name=ICAS root-folder "/ADF"
 
