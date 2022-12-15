@@ -1,0 +1,9 @@
+{
+	"name": "Dave",
+	"location": "uksouth",
+	"identity": {
+		"type": "SystemAssigned",
+		"principalId": "72fbe357-3d7b-454e-a3a6-3c7b2cea17df",
+		"tenantId": "a4d4d5cd-20cf-444e-bfe7-3d3ecef3fe94"
+	}
+}
